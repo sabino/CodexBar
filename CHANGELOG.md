@@ -2,6 +2,9 @@
 
 ## 0.49.7 — Unreleased
 
+### Added
+- Native cross-platform app: add the versioned engine bridge used by the shared Rust + Slint frontend, exposing the complete 69-provider catalog, provider-specific detail sections and pace, enablement actions, and 30-day local cost history without embedding a browser runtime.
+
 ### Fixed
 - Codex: show Business accounts' monthly credit remaining in the provider switcher when no session or weekly rate-limit window is available, and keep quota indicators visible on the selected provider tab (#2926). Thanks @jey3dayo!
 - Gemini: offer the Antigravity provider migration when local OAuth recovery cannot use Gemini CLI and an `agy` or Antigravity installation is available (#2808). Thanks @axisrow!

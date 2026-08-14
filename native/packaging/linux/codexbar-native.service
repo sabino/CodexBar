@@ -8,6 +8,8 @@ PartOf=graphical-session.target
 Type=simple
 ExecStart=%h/.local/bin/codexbar-native
 Environment=SLINT_BACKEND=winit-software
+Environment=CODEXBAR_ENGINE=%h/.local/lib/codexbar-native/CodexBarCLI
+KillMode=process
 Restart=on-failure
 RestartSec=2
 

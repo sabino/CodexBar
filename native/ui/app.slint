@@ -1,197 +1,931 @@
-import { AboutSlint, Button, HorizontalBox, Spinner, VerticalBox } from "std-widgets.slint";
+export struct ProviderItem {
+    id: string,
+    name: string,
+    short-name: string,
+    icon: image,
+    accent: color,
+    enabled: bool,
+    selected: bool,
+    has-data: bool,
+    has-error: bool,
+    status-color: color,
+    status-text: string,
+    summary: string,
+}
 
-component UsageCard inherits Rectangle {
-    in property <string> heading;
-    in property <float> used-percent;
-    in property <string> remaining-text;
-    in property <string> reset-text;
+export struct UsageLane {
+    kind: string,
+    label: string,
+    used-percent: float,
+    value-text: string,
+    reset-text: string,
+    pace-text: string,
+    pace-deficit: bool,
+    accent: color,
+}
 
-    height: 122px;
-    background: #171c25;
-    border-color: #293140;
-    border-width: 1px;
-    border-radius: 14px;
+export struct DetailRow {
+    section: string,
+    label: string,
+    value: string,
+    secondary: string,
+}
+
+export struct HistoryPoint {
+    label: string,
+    value-text: string,
+    normalized: float,
+    accent: color,
+}
+
+export struct SpendRow {
+    rank: string,
+    label: string,
+    value: string,
+    detail: string,
+    accent: color,
+}
+
+component NativeButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> enabled: true;
+    in property <bool> primary: false;
+    in property <bool> destructive: false;
+    in property <color> accent: #49a3b0;
+    callback clicked();
+
+    height: 30px;
+    min-width: 72px;
+    border-radius: 7px;
+    border-width: root.primary ? 0px : 1px;
+    border-color: root.destructive ? #794145 : #ffffff24;
+    background: !root.enabled ? #ffffff0a
+        : touch.pressed ? (root.primary ? root.accent.darker(18%) : #ffffff20)
+        : touch.has-hover ? (root.primary ? root.accent.brighter(8%) : #ffffff16)
+        : root.primary ? root.accent : root.destructive ? #3b2024 : #ffffff0d;
+
+    Text {
+        text: root.text;
+        color: !root.enabled ? #ffffff58 : root.primary ? #ffffff : root.destructive ? #ffb4b8 : #f3f3f3;
+        font-size: 12px;
+        font-weight: 550;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+    }
+}
+
+component IconButton inherits Rectangle {
+    in property <string> glyph;
+    in property <string> tooltip;
+    callback clicked();
+
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    background: touch.pressed ? #ffffff22 : touch.has-hover ? #ffffff16 : transparent;
+
+    Text {
+        text: root.glyph;
+        color: #dddddf;
+        font-size: 15px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    touch := TouchArea { clicked => { root.clicked(); } }
+}
+
+component ProviderChip inherits Rectangle {
+    in property <ProviderItem> provider;
+    callback clicked();
+
+    width: 62px;
+    height: 49px;
+    border-radius: 8px;
+    background: root.provider.selected ? #ffffff18 : touch.has-hover ? #ffffff0d : transparent;
+    border-width: root.provider.selected ? 1px : 0px;
+    border-color: root.provider.selected ? #ffffff1f : transparent;
 
     VerticalLayout {
-        padding: 16px;
-        spacing: 10px;
+        padding-top: 4px;
+        padding-bottom: 3px;
+        spacing: 1px;
+        HorizontalLayout {
+            Rectangle { }
+            Image {
+                source: root.provider.icon;
+                width: 18px;
+                height: 18px;
+                image-fit: contain;
+                colorize: root.provider.has-data ? #f2f2f2 : #8d8d91;
+            }
+            Rectangle { }
+        }
+        Text {
+            text: root.provider.short-name;
+            color: root.provider.selected ? #f3f3f4 : #9b9ba0;
+            font-size: 8px;
+            font-weight: root.provider.selected ? 600 : 450;
+            horizontal-alignment: center;
+            overflow: elide;
+        }
+        Rectangle {
+            height: 2px;
+            width: 28px;
+            border-radius: 1px;
+            background: root.provider.selected ? root.provider.accent : transparent;
+            horizontal-stretch: 0;
+        }
+    }
+
+    Rectangle {
+        x: parent.width - 10px;
+        y: 5px;
+        width: 5px;
+        height: 5px;
+        border-radius: 3px;
+        background: root.provider.has-error ? #ff6b6f : root.provider.status-color;
+        visible: root.provider.has-error || root.provider.status-text != "";
+    }
+
+    touch := TouchArea { clicked => { root.clicked(); } }
+}
+
+component UsageLaneCard inherits Rectangle {
+    in property <UsageLane> lane;
+
+    height: root.lane.pace-text == "" ? 82px : 101px;
+    border-radius: 10px;
+    background: #ffffff09;
+    border-width: 1px;
+    border-color: #ffffff12;
+
+    VerticalLayout {
+        padding: 12px;
+        spacing: 7px;
 
         HorizontalLayout {
             Text {
-                text: root.heading;
-                color: #f5f7fb;
-                font-size: 16px;
-                font-weight: 700;
+                text: root.lane.label;
+                color: #f4f4f5;
+                font-size: 13px;
+                font-weight: 620;
+                overflow: elide;
             }
             Rectangle { }
             Text {
-                text: root.remaining-text;
-                color: root.used-percent >= 80 ? #ef5350 : root.used-percent >= 50 ? #ffb74d : #57d68d;
-                font-size: 15px;
-                font-weight: 700;
+                text: root.lane.value-text;
+                color: root.lane.used-percent >= 80 ? #ff8589 : root.lane.used-percent >= 50 ? #ffc66e : #f4f4f5;
+                font-size: 12px;
+                font-weight: 650;
             }
         }
 
         Rectangle {
-            height: 10px;
-            background: #2a3241;
-            border-radius: 5px;
-
+            height: 7px;
+            border-radius: 4px;
+            background: #ffffff14;
             Rectangle {
-                width: parent.width * root.used-percent / 100;
+                width: parent.width * root.lane.used-percent / 100;
                 height: parent.height;
-                border-radius: 5px;
-                background: root.used-percent >= 80 ? #ef5350 : root.used-percent >= 50 ? #ffb74d : #57d68d;
+                border-radius: 4px;
+                background: root.lane.used-percent >= 90 ? #ff5f63
+                    : root.lane.used-percent >= 70 ? #f4a742
+                    : root.lane.accent;
             }
         }
 
-        Text {
-            text: root.reset-text;
-            color: #9ba7b8;
-            font-size: 13px;
+        HorizontalLayout {
+            Text {
+                text: root.lane.reset-text;
+                color: #9c9ca1;
+                font-size: 10px;
+                overflow: elide;
+            }
+            Rectangle { }
+            Text {
+                text: root.lane.pace-text;
+                color: root.lane.pace-text == "" ? transparent
+                    : root.lane.pace-deficit ? #ff9f75 : #77d9a5;
+                font-size: 10px;
+                font-weight: 550;
+                overflow: elide;
+            }
         }
     }
 }
 
+component SidebarRow inherits Rectangle {
+    in property <string> glyph;
+    in property <string> label;
+    in property <bool> selected: false;
+    in property <color> accent: #49a3b0;
+    callback clicked();
+
+    height: 27px;
+    border-radius: 7px;
+    background: root.selected ? root.accent.with-alpha(0.28) : touch.has-hover ? #ffffff0b : transparent;
+
+    HorizontalLayout {
+        padding-left: 9px;
+        padding-right: 8px;
+        spacing: 8px;
+        Text {
+            text: root.glyph;
+            color: root.selected ? #ffffff : #a7a7ac;
+            font-size: 13px;
+            vertical-alignment: center;
+        }
+        Text {
+            text: root.label;
+            color: root.selected ? #ffffff : #d2d2d5;
+            font-size: 12px;
+            font-weight: root.selected ? 600 : 430;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+    }
+    touch := TouchArea { clicked => { root.clicked(); } }
+}
+
+component NativeToggle inherits Rectangle {
+    in property <bool> checked;
+    in property <bool> enabled: true;
+    in property <color> accent: #49a3b0;
+    callback toggled(bool);
+
+    width: 34px;
+    height: 19px;
+    border-radius: 10px;
+    background: !root.enabled ? #ffffff12 : root.checked ? root.accent : #ffffff26;
+    Rectangle {
+        x: root.checked ? 17px : 2px;
+        y: 2px;
+        width: 15px;
+        height: 15px;
+        border-radius: 8px;
+        background: root.enabled ? #ffffff : #ffffff68;
+        animate x { duration: 110ms; easing: ease-in-out; }
+    }
+    touch := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.toggled(!root.checked); }
+    }
+}
+
+component GroupCard inherits Rectangle {
+    border-radius: 10px;
+    background: #ffffff09;
+    border-width: 1px;
+    border-color: #ffffff12;
+}
+
 export component MainWindow inherits Window {
     title: "CodexBar";
-    preferred-width: 430px;
-    preferred-height: 560px;
-    min-width: 380px;
-    min-height: 460px;
-    background: #0c1017;
+    preferred-width: 340px;
+    preferred-height: 480px;
+    min-width: 340px;
+    min-height: 480px;
+    background: #1f1f22;
 
-    in-out property <string> account-text: "Signed in";
-    in-out property <string> plan-text: "Codex";
-    in-out property <string> status-text: "Starting…";
-    in-out property <bool> loading: true;
-    in-out property <bool> session-visible: false;
-    in-out property <float> session-used: 0;
-    in-out property <string> session-remaining: "";
-    in-out property <string> session-reset: "";
-    in-out property <bool> weekly-visible: false;
-    in-out property <float> weekly-used: 0;
-    in-out property <string> weekly-remaining: "";
-    in-out property <string> weekly-reset: "";
-    in-out property <bool> credits-visible: false;
+    in-out property <[ProviderItem]> providers;
+    in-out property <[UsageLane]> usage-lanes;
+    in-out property <[DetailRow]> details;
+    in-out property <image> selected-icon;
+    in-out property <color> selected-accent: #49a3b0;
+    in-out property <string> selected-name: "Codex";
+    in-out property <string> selected-account: "";
+    in-out property <string> selected-plan: "";
+    in-out property <string> selected-source: "";
+    in-out property <string> selected-status: "";
+    in-out property <string> selected-error: "";
     in-out property <string> credits-text: "";
+    in-out property <string> today-cost-text: "";
+    in-out property <string> month-cost-text: "";
+    in-out property <string> updated-text: "Starting…";
+    in-out property <string> engine-text: "";
+    in-out property <bool> loading: true;
+    in-out property <bool> dashboard-available: false;
 
+    callback select-provider(int);
     callback refresh();
-    callback hide-window();
     callback open-dashboard();
-    callback show-about();
+    callback show-settings();
+    callback show-history();
+    callback hide-window();
     callback quit();
 
     VerticalLayout {
-        padding: 24px;
-        spacing: 16px;
+        padding-top: 8px;
+        spacing: 0px;
 
-        HorizontalLayout {
-            spacing: 12px;
+        Rectangle {
+            height: 51px;
+            background: #171719;
+            border-color: #ffffff12;
+            border-width: 0px;
+
+            Flickable {
+                width: parent.width - 82px;
+                height: parent.height;
+                viewport-width: switcher.width;
+                viewport-height: parent.height;
+                switcher := HorizontalLayout {
+                    width: root.providers.length * 62px;
+                    height: parent.height;
+                    spacing: 0px;
+                    for provider[index] in root.providers : ProviderChip {
+                        provider: provider;
+                        clicked => { root.select-provider(index); }
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                x: parent.width - 78px;
+                width: 70px;
+                height: parent.height;
+                spacing: 4px;
+                IconButton {
+                    glyph: root.loading ? "↻" : "↻";
+                    tooltip: "Refresh";
+                    clicked => { root.refresh(); }
+                }
+                IconButton {
+                    glyph: "⚙";
+                    tooltip: "Settings";
+                    clicked => { root.show-settings(); }
+                }
+            }
+        }
+
+        Rectangle { height: 1px; background: #ffffff12; }
+
+        Flickable {
+            viewport-height: content.preferred-height;
+            content := VerticalLayout {
+                width: root.width;
+                padding: 16px;
+                spacing: 12px;
+
+                HorizontalLayout {
+                    height: 42px;
+                    spacing: 10px;
+                    Rectangle {
+                        width: 34px;
+                        height: 34px;
+                        border-radius: 9px;
+                        background: root.selected-accent.with-alpha(0.20);
+                        Image {
+                            source: root.selected-icon;
+                            x: 6px;
+                            y: 6px;
+                            width: 22px;
+                            height: 22px;
+                            image-fit: contain;
+                            colorize: #f4f4f5;
+                        }
+                    }
+                    VerticalLayout {
+                        spacing: 1px;
+                        Text {
+                            text: root.selected-name;
+                            color: #f7f7f8;
+                            font-size: 17px;
+                            font-weight: 680;
+                            overflow: elide;
+                        }
+                        Text {
+                            text: root.selected-account + (root.selected-account != "" && root.selected-plan != "" ? "  ·  " : "") + root.selected-plan;
+                            color: #a3a3a8;
+                            font-size: 10px;
+                            overflow: elide;
+                        }
+                    }
+                    Rectangle { }
+                    Rectangle {
+                        width: status-text.preferred-width + 17px;
+                        height: 22px;
+                        border-radius: 11px;
+                        background: root.selected-error != "" ? #ff62651f : #ffffff0b;
+                        HorizontalLayout {
+                            padding-left: 7px;
+                            padding-right: 7px;
+                            spacing: 5px;
+                            Rectangle {
+                                width: 6px;
+                                height: 6px;
+                                border-radius: 3px;
+                                background: root.selected-error != "" ? #ff6b70 : #62d394;
+                                vertical-stretch: 0;
+                            }
+                            status-text := Text {
+                                text: root.selected-error != "" ? "Error" : root.selected-status == "" ? "Ready" : root.selected-status;
+                                color: #c8c8cc;
+                                font-size: 9px;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                if root.selected-error != "" : Rectangle {
+                    height: error-text.preferred-height + 20px;
+                    border-radius: 9px;
+                    background: #ff5f6314;
+                    border-width: 1px;
+                    border-color: #ff73762c;
+                    error-text := Text {
+                        x: 10px;
+                        y: 9px;
+                        width: parent.width - 20px;
+                        text: root.selected-error;
+                        color: #ffb6b8;
+                        font-size: 10px;
+                        wrap: word-wrap;
+                    }
+                }
+
+                for lane in root.usage-lanes : UsageLaneCard { lane: lane; }
+
+                if root.usage-lanes.length == 0 && !root.loading : GroupCard {
+                    height: 78px;
+                    Text {
+                        text: "No quota windows are available for this provider.";
+                        color: #9e9ea3;
+                        font-size: 11px;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                        wrap: word-wrap;
+                    }
+                }
+
+                if root.credits-text != "" || root.today-cost-text != "" || root.month-cost-text != "" : GroupCard {
+                    height: 62px;
+                    HorizontalLayout {
+                        padding: 11px;
+                        spacing: 12px;
+                        if root.credits-text != "" : VerticalLayout {
+                            spacing: 2px;
+                            Text { text: "Extra usage"; color: #8f8f94; font-size: 9px; }
+                            Text { text: root.credits-text; color: #f0f0f2; font-size: 12px; font-weight: 620; }
+                        }
+                        if root.today-cost-text != "" : VerticalLayout {
+                            spacing: 2px;
+                            Text { text: "Today"; color: #8f8f94; font-size: 9px; }
+                            Text { text: root.today-cost-text; color: #f0f0f2; font-size: 12px; font-weight: 620; }
+                        }
+                        if root.month-cost-text != "" : VerticalLayout {
+                            spacing: 2px;
+                            Text { text: "30 days"; color: #8f8f94; font-size: 9px; }
+                            Text { text: root.month-cost-text; color: #f0f0f2; font-size: 12px; font-weight: 620; }
+                        }
+                    }
+                }
+
+                if root.details.length > 0 : GroupCard {
+                    height: details-layout.preferred-height + 20px;
+                    details-layout := VerticalLayout {
+                        x: 11px;
+                        y: 10px;
+                        width: parent.width - 22px;
+                        spacing: 7px;
+                        for row in root.details : HorizontalLayout {
+                            height: 18px;
+                            Text {
+                                text: row.label;
+                                color: #a0a0a5;
+                                font-size: 10px;
+                                overflow: elide;
+                            }
+                            Rectangle { }
+                            Text {
+                                text: row.value + (row.secondary == "" ? "" : "  ·  " + row.secondary);
+                                color: #ededee;
+                                font-size: 10px;
+                                font-weight: 560;
+                                overflow: elide;
+                            }
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    height: 30px;
+                    spacing: 7px;
+                    NativeButton {
+                        text: "Usage & Spend";
+                        clicked => { root.show-history(); }
+                    }
+                    NativeButton {
+                        text: "Dashboard";
+                        enabled: root.dashboard-available;
+                        clicked => { root.open-dashboard(); }
+                    }
+                    Rectangle { }
+                    NativeButton {
+                        text: "Hide";
+                        clicked => { root.hide-window(); }
+                    }
+                }
+
+                VerticalLayout {
+                    spacing: 0px;
+                    Text {
+                        text: root.loading ? "Refreshing all enabled providers…" : root.updated-text;
+                        color: #85858b;
+                        font-size: 9px;
+                        horizontal-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component SettingsWindow inherits Window {
+    title: "CodexBar Settings";
+    preferred-width: 880px;
+    preferred-height: 620px;
+    min-width: 880px;
+    min-height: 620px;
+    background: #202023;
+
+    in-out property <[ProviderItem]> providers;
+    in-out property <[HistoryPoint]> history-points;
+    in-out property <[SpendRow]> provider-spend;
+    in-out property <[SpendRow]> model-spend;
+    in-out property <int> navigation-index: 0;
+    in-out property <int> provider-index: 0;
+    in-out property <int> history-days: 30;
+    in-out property <string> total-spend: "$0.00";
+    in-out property <string> spend-subtitle: "Local estimated cost history across supported providers.";
+    in-out property <string> engine-path: "";
+    in-out property <string> selected-provider-name: "";
+    in-out property <string> selected-provider-summary: "";
+    in-out property <string> selected-provider-source: "";
+    in-out property <string> selected-provider-status: "";
+    in-out property <string> selected-provider-account: "";
+    in-out property <string> selected-provider-dashboard: "";
+    in-out property <bool> selected-provider-enabled: false;
+    in-out property <bool> loading: false;
+    in-out property <color> accent: #49a3b0;
+
+    callback navigate(int);
+    callback select-provider(int);
+    callback toggle-provider(int, bool);
+    callback set-history-days(int);
+    callback refresh();
+    callback open-provider-dashboard();
+    callback close-settings();
+
+    HorizontalLayout {
+        Rectangle {
+            width: 226px;
+            background: #19191c;
+            border-width: 0px;
+
             VerticalLayout {
+                padding: 10px;
                 spacing: 3px;
                 Text {
                     text: "CodexBar";
-                    color: #f5f7fb;
-                    font-size: 26px;
-                    font-weight: 800;
+                    color: #f4f4f5;
+                    font-size: 17px;
+                    font-weight: 700;
+                    height: 25px;
+                    vertical-alignment: center;
                 }
+
+                Rectangle {
+                    height: 26px;
+                    border-radius: 7px;
+                    background: #ffffff0b;
+                    border-width: 1px;
+                    border-color: #ffffff12;
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        spacing: 6px;
+                        Text { text: "⌕"; color: #85858a; font-size: 14px; vertical-alignment: center; }
+                        Text { text: "Search providers"; color: #747479; font-size: 11px; vertical-alignment: center; }
+                    }
+                }
+
+                SidebarRow { glyph: "⌂"; label: "General"; selected: root.navigation-index == 0; accent: root.accent; clicked => { root.navigate(0); } }
+                SidebarRow { glyph: "▥"; label: "Usage & Spend"; selected: root.navigation-index == 1; accent: root.accent; clicked => { root.navigate(1); } }
+                SidebarRow { glyph: "◉"; label: "Notifications"; selected: root.navigation-index == 2; accent: root.accent; clicked => { root.navigate(2); } }
+                SidebarRow { glyph: "▰"; label: "Menu Bar"; selected: root.navigation-index == 3; accent: root.accent; clicked => { root.navigate(3); } }
+                SidebarRow { glyph: "☰"; label: "Menu"; selected: root.navigation-index == 4; accent: root.accent; clicked => { root.navigate(4); } }
+                SidebarRow { glyph: "⚙"; label: "Advanced"; selected: root.navigation-index == 5; accent: root.accent; clicked => { root.navigate(5); } }
+                SidebarRow { glyph: "ⓘ"; label: "About"; selected: root.navigation-index == 6; accent: root.accent; clicked => { root.navigate(6); } }
+
                 Text {
-                    text: root.account-text + " · " + root.plan-text;
-                    color: #9ba7b8;
-                    font-size: 13px;
-                    overflow: elide;
+                    text: "PROVIDERS";
+                    color: #6f6f75;
+                    font-size: 9px;
+                    font-weight: 650;
+                    height: 18px;
+                    vertical-alignment: bottom;
+                }
+
+                Flickable {
+                    viewport-height: provider-list.height;
+                    provider-list := VerticalLayout {
+                        width: parent.width;
+                        height: root.providers.length * 29px;
+                        spacing: 2px;
+                        for provider[index] in root.providers : Rectangle {
+                            height: 27px;
+                            border-radius: 7px;
+                            background: root.navigation-index == 7 && provider.selected ? root.accent.with-alpha(0.25)
+                                : row-touch.has-hover ? #ffffff0a : transparent;
+                            HorizontalLayout {
+                                padding-left: 8px;
+                                padding-right: 7px;
+                                spacing: 7px;
+                                Image {
+                                    source: provider.icon;
+                                    width: 15px;
+                                    height: 15px;
+                                    image-fit: contain;
+                                    colorize: provider.enabled ? #e5e5e7 : #747479;
+                                }
+                                Text {
+                                    text: provider.name;
+                                    color: provider.enabled ? #d8d8da : #85858a;
+                                    font-size: 10px;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                }
+                                Rectangle { }
+                                Rectangle {
+                                    width: 6px;
+                                    height: 6px;
+                                    border-radius: 3px;
+                                    background: provider.has-error ? #ff666a : provider.enabled ? #5ed18f : #55555a;
+                                    vertical-stretch: 0;
+                                }
+                            }
+                            row-touch := TouchArea { clicked => { root.select-provider(index); } }
+                        }
+                    }
                 }
             }
-            Rectangle { }
-            if root.loading : Spinner {
-                width: 26px;
-                height: 26px;
+        }
+
+        Rectangle { width: 1px; background: #ffffff12; }
+
+        settings-pane := Rectangle {
+            background: #222225;
+
+            if root.navigation-index == 1 : Flickable {
+                viewport-height: spend-content.preferred-height;
+                spend-content := VerticalLayout {
+                    width: settings-pane.width;
+                    padding: 24px;
+                    spacing: 16px;
+
+                    HorizontalLayout {
+                        height: 46px;
+                        VerticalLayout {
+                            spacing: 3px;
+                            Text { text: "Usage & Spend"; color: #f3f3f4; font-size: 21px; font-weight: 680; }
+                            Text { text: root.spend-subtitle; color: #97979c; font-size: 11px; }
+                        }
+                        Rectangle { }
+                        Rectangle {
+                            width: 104px;
+                            height: 28px;
+                            border-radius: 7px;
+                            background: #ffffff0b;
+                            HorizontalLayout {
+                                padding: 2px;
+                                spacing: 2px;
+                                Rectangle {
+                                    border-radius: 6px;
+                                    background: root.history-days == 7 ? #ffffff20 : transparent;
+                                    Text { text: "7d"; color: #e5e5e7; font-size: 10px; horizontal-alignment: center; vertical-alignment: center; }
+                                    TouchArea { clicked => { root.set-history-days(7); } }
+                                }
+                                Rectangle {
+                                    border-radius: 6px;
+                                    background: root.history-days == 30 ? #ffffff20 : transparent;
+                                    Text { text: "30d"; color: #e5e5e7; font-size: 10px; horizontal-alignment: center; vertical-alignment: center; }
+                                    TouchArea { clicked => { root.set-history-days(30); } }
+                                }
+                            }
+                        }
+                        NativeButton { text: root.loading ? "Refreshing…" : "Refresh"; enabled: !root.loading; clicked => { root.refresh(); } }
+                    }
+
+                    GroupCard {
+                        height: 194px;
+                        VerticalLayout {
+                            padding: 14px;
+                            spacing: 10px;
+                            HorizontalLayout {
+                                Text { text: "Estimated total"; color: #a2a2a7; font-size: 11px; }
+                                Rectangle { }
+                                Text { text: root.total-spend; color: #f6f6f7; font-size: 22px; font-weight: 700; }
+                            }
+                            chart-area := Rectangle {
+                                height: 133px;
+                                background: #00000018;
+                                border-radius: 7px;
+                                HorizontalLayout {
+                                    padding-left: 8px;
+                                    padding-right: 8px;
+                                    padding-top: 8px;
+                                    spacing: 4px;
+                                    for point in root.history-points : VerticalLayout {
+                                        spacing: 3px;
+                                        Rectangle {
+                                            vertical-stretch: 1;
+                                            Rectangle {
+                                                y: parent.height - self.height;
+                                                width: parent.width;
+                                                height: (chart-area.height - 4px) * point.normalized;
+                                                min-height: point.normalized > 0 ? 2px : 0px;
+                                                border-radius: 3px;
+                                                background: point.accent;
+                                            }
+                                        }
+                                        Text {
+                                            text: point.label;
+                                            color: #737378;
+                                            font-size: 7px;
+                                            horizontal-alignment: center;
+                                            overflow: elide;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 14px;
+                        GroupCard {
+                            height: provider-spend-layout.preferred-height + 28px;
+                            provider-spend-layout := VerticalLayout {
+                                x: 13px;
+                                y: 13px;
+                                width: parent.width - 26px;
+                                spacing: 10px;
+                                Text { text: "Subscriptions"; color: #eeeeef; font-size: 13px; font-weight: 650; }
+                                for row in root.provider-spend : HorizontalLayout {
+                                    height: 32px;
+                                    Rectangle { width: 4px; height: 22px; border-radius: 2px; background: row.accent; vertical-stretch: 0; }
+                                    VerticalLayout {
+                                        spacing: 1px;
+                                        Text { text: row.label; color: #dedee0; font-size: 10px; font-weight: 560; overflow: elide; }
+                                        Text { text: row.detail; color: #77777c; font-size: 8px; overflow: elide; }
+                                    }
+                                    Rectangle { }
+                                    Text { text: row.value; color: #efeff0; font-size: 10px; font-weight: 620; vertical-alignment: center; }
+                                }
+                            }
+                        }
+                        GroupCard {
+                            height: model-spend-layout.preferred-height + 28px;
+                            model-spend-layout := VerticalLayout {
+                                x: 13px;
+                                y: 13px;
+                                width: parent.width - 26px;
+                                spacing: 10px;
+                                Text { text: "Models"; color: #eeeeef; font-size: 13px; font-weight: 650; }
+                                for row in root.model-spend : HorizontalLayout {
+                                    height: 32px;
+                                    Text { text: row.rank; color: #77777c; font-size: 9px; width: 20px; vertical-alignment: center; }
+                                    VerticalLayout {
+                                        spacing: 1px;
+                                        Text { text: row.label; color: #dedee0; font-size: 10px; font-weight: 560; overflow: elide; }
+                                        Text { text: row.detail; color: #77777c; font-size: 8px; overflow: elide; }
+                                    }
+                                    Rectangle { }
+                                    Text { text: row.value; color: #efeff0; font-size: 10px; font-weight: 620; vertical-alignment: center; }
+                                }
+                            }
+                        }
+                    }
+                }
             }
-        }
 
-        Rectangle {
-            height: 1px;
-            background: #252c38;
-        }
-
-        if root.session-visible : UsageCard {
-            heading: "Session";
-            used-percent: root.session-used;
-            remaining-text: root.session-remaining;
-            reset-text: root.session-reset;
-        }
-
-        if root.weekly-visible : UsageCard {
-            heading: "Weekly";
-            used-percent: root.weekly-used;
-            remaining-text: root.weekly-remaining;
-            reset-text: root.weekly-reset;
-        }
-
-        if !root.session-visible && !root.weekly-visible && !root.loading : Rectangle {
-            height: 120px;
-            background: #171c25;
-            border-color: #293140;
-            border-width: 1px;
-            border-radius: 14px;
-            Text {
-                text: "No rate-limit windows were returned.";
-                color: #9ba7b8;
-                horizontal-alignment: center;
-                vertical-alignment: center;
+            if root.navigation-index == 7 : Flickable {
+                viewport-height: provider-content.preferred-height;
+                provider-content := VerticalLayout {
+                    width: settings-pane.width;
+                    padding: 24px;
+                    spacing: 16px;
+                    HorizontalLayout {
+                        height: 42px;
+                        VerticalLayout {
+                            spacing: 3px;
+                            Text { text: root.selected-provider-name; color: #f3f3f4; font-size: 21px; font-weight: 680; }
+                            Text { text: root.selected-provider-summary; color: #96969b; font-size: 11px; overflow: elide; }
+                        }
+                        Rectangle { }
+                        NativeToggle {
+                            checked: root.selected-provider-enabled;
+                            accent: root.accent;
+                            toggled(value) => { root.toggle-provider(root.provider-index, value); }
+                        }
+                    }
+                    Text { text: "ACCOUNT"; color: #77777c; font-size: 9px; font-weight: 650; }
+                    GroupCard {
+                        height: 124px;
+                        VerticalLayout {
+                            padding: 13px;
+                            spacing: 11px;
+                            HorizontalLayout {
+                                Text { text: "Account"; color: #a2a2a7; font-size: 11px; }
+                                Rectangle { }
+                                Text { text: root.selected-provider-account == "" ? "Not reported" : root.selected-provider-account; color: #efeff0; font-size: 11px; overflow: elide; }
+                            }
+                            Rectangle { height: 1px; background: #ffffff10; }
+                            HorizontalLayout {
+                                Text { text: "Source"; color: #a2a2a7; font-size: 11px; }
+                                Rectangle { }
+                                Text { text: root.selected-provider-source == "" ? "Automatic" : root.selected-provider-source; color: #efeff0; font-size: 11px; }
+                            }
+                            Rectangle { height: 1px; background: #ffffff10; }
+                            HorizontalLayout {
+                                Text { text: "Status"; color: #a2a2a7; font-size: 11px; }
+                                Rectangle { }
+                                Text { text: root.selected-provider-status == "" ? "Unknown" : root.selected-provider-status; color: #efeff0; font-size: 11px; }
+                            }
+                        }
+                    }
+                    Text { text: "ACTIONS"; color: #77777c; font-size: 9px; font-weight: 650; }
+                    GroupCard {
+                        height: 62px;
+                        HorizontalLayout {
+                            padding: 13px;
+                            Text { text: "Open the provider's usage or billing dashboard."; color: #a2a2a7; font-size: 11px; vertical-alignment: center; }
+                            Rectangle { }
+                            NativeButton { text: "Open Dashboard"; enabled: root.selected-provider-dashboard != ""; clicked => { root.open-provider-dashboard(); } }
+                        }
+                    }
+                }
             }
-        }
 
-        if root.credits-visible : Rectangle {
-            height: 52px;
-            background: #131923;
-            border-radius: 10px;
-            Text {
-                text: root.credits-text;
-                color: #c6d0df;
-                horizontal-alignment: center;
-                vertical-alignment: center;
-                font-size: 13px;
-            }
-        }
-
-        Rectangle { }
-
-        Text {
-            text: root.status-text;
-            color: #7f8b9c;
-            font-size: 12px;
-            horizontal-alignment: center;
-            wrap: word-wrap;
-        }
-
-        HorizontalBox {
-            spacing: 8px;
-            Button {
-                text: root.loading ? "Refreshing…" : "Refresh";
-                enabled: !root.loading;
-                clicked => { root.refresh(); }
-            }
-            Button {
-                text: "Open usage";
-                clicked => { root.open-dashboard(); }
-            }
-            Button {
-                text: "About";
-                clicked => { root.show-about(); }
-            }
-        }
-
-        HorizontalBox {
-            spacing: 8px;
-            Button {
-                text: "Hide to tray";
-                clicked => { root.hide-window(); }
-            }
-            Button {
-                text: "Quit";
-                clicked => { root.quit(); }
+            if root.navigation-index != 1 && root.navigation-index != 7 : Flickable {
+                viewport-height: generic-content.preferred-height;
+                generic-content := VerticalLayout {
+                    width: settings-pane.width;
+                    padding: 24px;
+                    spacing: 16px;
+                    Text {
+                        text: root.navigation-index == 0 ? "General"
+                            : root.navigation-index == 2 ? "Notifications"
+                            : root.navigation-index == 3 ? "Menu Bar"
+                            : root.navigation-index == 4 ? "Menu"
+                            : root.navigation-index == 5 ? "Advanced" : "About";
+                        color: #f3f3f4;
+                        font-size: 21px;
+                        font-weight: 680;
+                    }
+                    Text {
+                        text: root.navigation-index == 0 ? "Shared cross-platform behavior and startup settings."
+                            : root.navigation-index == 2 ? "Quota, pace, reset, and provider status alerts."
+                            : root.navigation-index == 3 ? "Choose the metrics shown beside the tray icon."
+                            : root.navigation-index == 4 ? "Configure provider cards, optional details, and privacy."
+                            : root.navigation-index == 5 ? "Provider engine, diagnostics, and command-line integration."
+                            : "CodexBar Native · Rust + Slint UI · CodexBarCore provider engine";
+                        color: #99999e;
+                        font-size: 11px;
+                        wrap: word-wrap;
+                    }
+                    GroupCard {
+                        height: 160px;
+                        VerticalLayout {
+                            padding: 14px;
+                            spacing: 12px;
+                            HorizontalLayout {
+                                Text { text: "Launch at login"; color: #dedee0; font-size: 11px; }
+                                Rectangle { }
+                                NativeToggle { checked: true; accent: root.accent; }
+                            }
+                            Rectangle { height: 1px; background: #ffffff10; }
+                            HorizontalLayout {
+                                Text { text: "Refresh enabled providers"; color: #dedee0; font-size: 11px; }
+                                Rectangle { }
+                                Text { text: "Every 5 minutes"; color: #99999e; font-size: 10px; }
+                            }
+                            Rectangle { height: 1px; background: #ffffff10; }
+                            HorizontalLayout {
+                                Text { text: "Provider engine"; color: #dedee0; font-size: 11px; }
+                                Rectangle { }
+                                Text { text: root.engine-path; color: #85858a; font-size: 9px; overflow: elide; }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -199,40 +933,32 @@ export component MainWindow inherits Window {
 
 export component AboutWindow inherits Window {
     title: "About CodexBar";
-    preferred-width: 360px;
-    preferred-height: 310px;
-    background: #0c1017;
+    preferred-width: 380px;
+    preferred-height: 280px;
+    background: #202023;
 
     callback close-about();
     callback quit();
 
     VerticalLayout {
-        padding: 20px;
-        spacing: 12px;
-
+        padding: 26px;
+        spacing: 13px;
+        Text { text: "CodexBar"; color: #f5f5f6; font-size: 25px; font-weight: 750; horizontal-alignment: center; }
+        Text { text: "Native cross-platform edition"; color: #a0a0a5; font-size: 12px; horizontal-alignment: center; }
+        Rectangle { height: 1px; background: #ffffff12; }
         Text {
-            text: "CodexBar Native";
-            color: #f5f7fb;
-            font-size: 22px;
-            font-weight: 800;
-            horizontal-alignment: center;
-        }
-        Text {
-            text: "A native Rust + Slint tray app for Linux, macOS, and Windows.";
-            color: #9ba7b8;
-            horizontal-alignment: center;
+            text: "One Rust + Slint interface on Linux, macOS, and Windows, powered by the same CodexBarCore provider engine as the original macOS app.";
+            color: #b8b8bc;
+            font-size: 11px;
             wrap: word-wrap;
+            horizontal-alignment: center;
         }
-        AboutSlint { }
-        HorizontalBox {
-            Button {
-                text: "Close";
-                clicked => { root.close-about(); }
-            }
-            Button {
-                text: "Quit";
-                clicked => { root.quit(); }
-            }
+        Rectangle { }
+        HorizontalLayout {
+            Rectangle { }
+            NativeButton { text: "Close"; primary: true; clicked => { root.close-about(); } }
+            NativeButton { text: "Quit"; destructive: true; clicked => { root.quit(); } }
+            Rectangle { }
         }
     }
 }
@@ -241,15 +967,17 @@ export component AppTray inherits SystemTrayIcon {
     in-out property <string> tray-title <=> root.title;
     in-out property <string> tray-tooltip <=> root.tooltip;
     in-out property <int> icon-level: 0;
-    in-out property <string> provider-line: "Codex";
-    in-out property <string> session-line: "Session: loading…";
-    in-out property <string> weekly-line: "Weekly: loading…";
+    in-out property <string> provider-line: "CodexBar · loading…";
+    in-out property <string> lane-one-line: "";
+    in-out property <string> lane-two-line: "";
     in-out property <string> status-line: "Starting…";
-    in-out property <bool> session-visible: false;
-    in-out property <bool> weekly-visible: false;
+    in-out property <bool> lane-one-visible: false;
+    in-out property <bool> lane-two-visible: false;
     in-out property <bool> refreshing: true;
+    in-out property <bool> dashboard-available: false;
 
     callback toggle-window();
+    callback show-settings();
     callback refresh();
     callback open-dashboard();
     callback show-about();
@@ -261,47 +989,21 @@ export component AppTray inherits SystemTrayIcon {
         : root.icon-level == 1 ? @image-url("icons/quota-green.png")
         : @image-url("icons/loading.png");
 
-    clicked => { toggle-window(); }
+    clicked => { root.toggle-window(); }
 
     Menu {
-        MenuItem {
-            title: root.provider-line;
-            enabled: false;
-        }
-        if root.session-visible : MenuItem {
-            title: root.session-line;
-            enabled: false;
-        }
-        if root.weekly-visible : MenuItem {
-            title: root.weekly-line;
-            enabled: false;
-        }
-        MenuItem {
-            title: root.status-line;
-            enabled: false;
-        }
+        MenuItem { title: root.provider-line; enabled: false; }
+        if root.lane-one-visible : MenuItem { title: root.lane-one-line; enabled: false; }
+        if root.lane-two-visible : MenuItem { title: root.lane-two-line; enabled: false; }
+        MenuItem { title: root.status-line; enabled: false; }
         MenuSeparator { }
-        MenuItem {
-            title: "Open details";
-            activated => { root.toggle-window(); }
-        }
-        MenuItem {
-            title: root.refreshing ? "Refreshing…" : "Refresh now";
-            enabled: !root.refreshing;
-            activated => { root.refresh(); }
-        }
-        MenuItem {
-            title: "Open Codex usage";
-            activated => { root.open-dashboard(); }
-        }
+        MenuItem { title: "Open CodexBar"; activated => { root.toggle-window(); } }
+        MenuItem { title: "Usage & Spend"; activated => { root.show-settings(); } }
+        MenuItem { title: root.refreshing ? "Refreshing…" : "Refresh all providers"; enabled: !root.refreshing; activated => { root.refresh(); } }
+        MenuItem { title: "Open provider dashboard"; enabled: root.dashboard-available; activated => { root.open-dashboard(); } }
         MenuSeparator { }
-        MenuItem {
-            title: "About CodexBar";
-            activated => { root.show-about(); }
-        }
-        MenuItem {
-            title: "Quit";
-            activated => { root.quit(); }
-        }
+        MenuItem { title: "Settings…"; activated => { root.show-settings(); } }
+        MenuItem { title: "About CodexBar"; activated => { root.show-about(); } }
+        MenuItem { title: "Quit CodexBar"; activated => { root.quit(); } }
     }
 }

@@ -678,7 +678,6 @@ dependencies = [
  "slint-build",
  "thiserror 2.0.20",
  "ureq",
- "webbrowser",
  "windows-sys 0.61.2",
 ]
 

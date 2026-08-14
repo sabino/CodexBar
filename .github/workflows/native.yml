@@ -5,10 +5,16 @@ on:
     branches: [main, feat/linux]
     paths:
       - "native/**"
+      - "Sources/CodexBarCLI/CLIConfigCommand.swift"
+      - "Sources/CodexBarCLI/DashboardPayloads.swift"
+      - "Sources/CodexBarCLI/DashboardSnapshotBuilder.swift"
       - ".github/workflows/native.yml"
   pull_request:
     paths:
       - "native/**"
+      - "Sources/CodexBarCLI/CLIConfigCommand.swift"
+      - "Sources/CodexBarCLI/DashboardPayloads.swift"
+      - "Sources/CodexBarCLI/DashboardSnapshotBuilder.swift"
       - ".github/workflows/native.yml"
 
 concurrency:

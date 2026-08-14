@@ -56,6 +56,10 @@ struct DashboardProviderPayload: Encodable {
     let accounts: [DashboardAccountPayload]?
     /// Row-local failure of the multi-account source; the ambient provider row stays intact.
     let accountsError: String?
+    /// Provider-specific pace projection from the canonical presentation engine.
+    let pace: ProviderPacePayload?
+    /// Generic provider detail rows/charts, already bounded and display-safe in CodexBarCore.
+    let details: [ProviderDetailSection]
     private let detail: DashboardSnapshotDetail
 
     init(
@@ -73,6 +77,8 @@ struct DashboardProviderPayload: Encodable {
         updatedAt: Date?,
         accounts: [DashboardAccountPayload]?,
         accountsError: String?,
+        pace: ProviderPacePayload? = nil,
+        details: [ProviderDetailSection] = [],
         detail: DashboardSnapshotDetail = .full)
     {
         self.id = id
@@ -89,6 +95,8 @@ struct DashboardProviderPayload: Encodable {
         self.updatedAt = updatedAt
         self.accounts = accounts
         self.accountsError = accountsError
+        self.pace = pace
+        self.details = details
         self.detail = detail
     }
 
@@ -107,6 +115,8 @@ struct DashboardProviderPayload: Encodable {
         case updatedAt
         case accounts
         case accountsError
+        case pace
+        case details
     }
 
     func encode(to encoder: Encoder) throws {
@@ -126,6 +136,10 @@ struct DashboardProviderPayload: Encodable {
         try container.encode(self.updatedAt, forKey: .updatedAt)
         try container.encodeIfPresent(self.accounts, forKey: .accounts)
         try container.encodeIfPresent(self.accountsError, forKey: .accountsError)
+        try container.encodeIfPresent(self.pace, forKey: .pace)
+        if !self.details.isEmpty {
+            try container.encode(self.details, forKey: .details)
+        }
     }
 }
 
