@@ -12,7 +12,7 @@ use std::thread;
 use std::time::Duration;
 
 use chrono::{DateTime, Local, NaiveDate};
-use slint::{Color, ComponentHandle, ModelRc, Timer, TimerMode, VecModel};
+use slint::{CloseRequestResponse, Color, ComponentHandle, ModelRc, Timer, TimerMode, VecModel};
 
 use crate::codex::{CodexSnapshot, UsageWindow as CodexUsageWindow};
 use crate::engine::{
@@ -126,6 +126,33 @@ fn wire_visibility(
     tray: &AppTray,
     about: &AboutWindow,
 ) {
+    {
+        let window_weak = window.as_weak();
+        window.window().on_close_requested(move || {
+            if let Some(window) = window_weak.upgrade() {
+                let _ = window.hide();
+            }
+            CloseRequestResponse::KeepWindowShown
+        });
+    }
+    {
+        let settings_weak = settings.as_weak();
+        settings.window().on_close_requested(move || {
+            if let Some(settings) = settings_weak.upgrade() {
+                let _ = settings.hide();
+            }
+            CloseRequestResponse::KeepWindowShown
+        });
+    }
+    {
+        let about_weak = about.as_weak();
+        about.window().on_close_requested(move || {
+            if let Some(about) = about_weak.upgrade() {
+                let _ = about.hide();
+            }
+            CloseRequestResponse::KeepWindowShown
+        });
+    }
     {
         let window_weak = window.as_weak();
         tray.on_toggle_window(move || {
