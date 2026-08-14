@@ -1,0 +1,307 @@
+import { AboutSlint, Button, HorizontalBox, Spinner, VerticalBox } from "std-widgets.slint";
+
+component UsageCard inherits Rectangle {
+    in property <string> heading;
+    in property <float> used-percent;
+    in property <string> remaining-text;
+    in property <string> reset-text;
+
+    height: 122px;
+    background: #171c25;
+    border-color: #293140;
+    border-width: 1px;
+    border-radius: 14px;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 10px;
+
+        HorizontalLayout {
+            Text {
+                text: root.heading;
+                color: #f5f7fb;
+                font-size: 16px;
+                font-weight: 700;
+            }
+            Rectangle { }
+            Text {
+                text: root.remaining-text;
+                color: root.used-percent >= 80 ? #ef5350 : root.used-percent >= 50 ? #ffb74d : #57d68d;
+                font-size: 15px;
+                font-weight: 700;
+            }
+        }
+
+        Rectangle {
+            height: 10px;
+            background: #2a3241;
+            border-radius: 5px;
+
+            Rectangle {
+                width: parent.width * root.used-percent / 100;
+                height: parent.height;
+                border-radius: 5px;
+                background: root.used-percent >= 80 ? #ef5350 : root.used-percent >= 50 ? #ffb74d : #57d68d;
+            }
+        }
+
+        Text {
+            text: root.reset-text;
+            color: #9ba7b8;
+            font-size: 13px;
+        }
+    }
+}
+
+export component MainWindow inherits Window {
+    title: "CodexBar";
+    preferred-width: 430px;
+    preferred-height: 560px;
+    min-width: 380px;
+    min-height: 460px;
+    background: #0c1017;
+
+    in-out property <string> account-text: "Signed in";
+    in-out property <string> plan-text: "Codex";
+    in-out property <string> status-text: "Starting…";
+    in-out property <bool> loading: true;
+    in-out property <bool> session-visible: false;
+    in-out property <float> session-used: 0;
+    in-out property <string> session-remaining: "";
+    in-out property <string> session-reset: "";
+    in-out property <bool> weekly-visible: false;
+    in-out property <float> weekly-used: 0;
+    in-out property <string> weekly-remaining: "";
+    in-out property <string> weekly-reset: "";
+    in-out property <bool> credits-visible: false;
+    in-out property <string> credits-text: "";
+
+    callback refresh();
+    callback hide-window();
+    callback open-dashboard();
+    callback show-about();
+    callback quit();
+
+    VerticalLayout {
+        padding: 24px;
+        spacing: 16px;
+
+        HorizontalLayout {
+            spacing: 12px;
+            VerticalLayout {
+                spacing: 3px;
+                Text {
+                    text: "CodexBar";
+                    color: #f5f7fb;
+                    font-size: 26px;
+                    font-weight: 800;
+                }
+                Text {
+                    text: root.account-text + " · " + root.plan-text;
+                    color: #9ba7b8;
+                    font-size: 13px;
+                    overflow: elide;
+                }
+            }
+            Rectangle { }
+            if root.loading : Spinner {
+                width: 26px;
+                height: 26px;
+            }
+        }
+
+        Rectangle {
+            height: 1px;
+            background: #252c38;
+        }
+
+        if root.session-visible : UsageCard {
+            heading: "Session";
+            used-percent: root.session-used;
+            remaining-text: root.session-remaining;
+            reset-text: root.session-reset;
+        }
+
+        if root.weekly-visible : UsageCard {
+            heading: "Weekly";
+            used-percent: root.weekly-used;
+            remaining-text: root.weekly-remaining;
+            reset-text: root.weekly-reset;
+        }
+
+        if !root.session-visible && !root.weekly-visible && !root.loading : Rectangle {
+            height: 120px;
+            background: #171c25;
+            border-color: #293140;
+            border-width: 1px;
+            border-radius: 14px;
+            Text {
+                text: "No rate-limit windows were returned.";
+                color: #9ba7b8;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
+        if root.credits-visible : Rectangle {
+            height: 52px;
+            background: #131923;
+            border-radius: 10px;
+            Text {
+                text: root.credits-text;
+                color: #c6d0df;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                font-size: 13px;
+            }
+        }
+
+        Rectangle { }
+
+        Text {
+            text: root.status-text;
+            color: #7f8b9c;
+            font-size: 12px;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+        }
+
+        HorizontalBox {
+            spacing: 8px;
+            Button {
+                text: root.loading ? "Refreshing…" : "Refresh";
+                enabled: !root.loading;
+                clicked => { root.refresh(); }
+            }
+            Button {
+                text: "Open usage";
+                clicked => { root.open-dashboard(); }
+            }
+            Button {
+                text: "About";
+                clicked => { root.show-about(); }
+            }
+        }
+
+        HorizontalBox {
+            spacing: 8px;
+            Button {
+                text: "Hide to tray";
+                clicked => { root.hide-window(); }
+            }
+            Button {
+                text: "Quit";
+                clicked => { root.quit(); }
+            }
+        }
+    }
+}
+
+export component AboutWindow inherits Window {
+    title: "About CodexBar";
+    preferred-width: 360px;
+    preferred-height: 310px;
+    background: #0c1017;
+
+    callback close-about();
+    callback quit();
+
+    VerticalLayout {
+        padding: 20px;
+        spacing: 12px;
+
+        Text {
+            text: "CodexBar Native";
+            color: #f5f7fb;
+            font-size: 22px;
+            font-weight: 800;
+            horizontal-alignment: center;
+        }
+        Text {
+            text: "A native Rust + Slint tray app for Linux, macOS, and Windows.";
+            color: #9ba7b8;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+        }
+        AboutSlint { }
+        HorizontalBox {
+            Button {
+                text: "Close";
+                clicked => { root.close-about(); }
+            }
+            Button {
+                text: "Quit";
+                clicked => { root.quit(); }
+            }
+        }
+    }
+}
+
+export component AppTray inherits SystemTrayIcon {
+    in-out property <string> tray-title <=> root.title;
+    in-out property <string> tray-tooltip <=> root.tooltip;
+    in-out property <int> icon-level: 0;
+    in-out property <string> provider-line: "Codex";
+    in-out property <string> session-line: "Session: loading…";
+    in-out property <string> weekly-line: "Weekly: loading…";
+    in-out property <string> status-line: "Starting…";
+    in-out property <bool> session-visible: false;
+    in-out property <bool> weekly-visible: false;
+    in-out property <bool> refreshing: true;
+
+    callback toggle-window();
+    callback refresh();
+    callback open-dashboard();
+    callback show-about();
+    callback quit();
+
+    icon: root.icon-level == 4 ? @image-url("icons/error.png")
+        : root.icon-level == 3 ? @image-url("icons/quota-red.png")
+        : root.icon-level == 2 ? @image-url("icons/quota-amber.png")
+        : root.icon-level == 1 ? @image-url("icons/quota-green.png")
+        : @image-url("icons/loading.png");
+
+    clicked => { toggle-window(); }
+
+    Menu {
+        MenuItem {
+            title: root.provider-line;
+            enabled: false;
+        }
+        if root.session-visible : MenuItem {
+            title: root.session-line;
+            enabled: false;
+        }
+        if root.weekly-visible : MenuItem {
+            title: root.weekly-line;
+            enabled: false;
+        }
+        MenuItem {
+            title: root.status-line;
+            enabled: false;
+        }
+        MenuSeparator { }
+        MenuItem {
+            title: "Open details";
+            activated => { root.toggle-window(); }
+        }
+        MenuItem {
+            title: root.refreshing ? "Refreshing…" : "Refresh now";
+            enabled: !root.refreshing;
+            activated => { root.refresh(); }
+        }
+        MenuItem {
+            title: "Open Codex usage";
+            activated => { root.open-dashboard(); }
+        }
+        MenuSeparator { }
+        MenuItem {
+            title: "About CodexBar";
+            activated => { root.show-about(); }
+        }
+        MenuItem {
+            title: "Quit";
+            activated => { root.quit(); }
+        }
+    }
+}

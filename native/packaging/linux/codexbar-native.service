@@ -1,0 +1,15 @@
+[Unit]
+Description=CodexBar native tray application
+Documentation=https://github.com/sabino/CodexBar/tree/feat/linux/native
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/codexbar-native
+Environment=SLINT_BACKEND=winit-software
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

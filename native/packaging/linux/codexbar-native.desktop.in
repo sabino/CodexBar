@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=CodexBar Native
+Comment=Show Codex usage and reset times
+Exec=@SHOW_HELPER@
+Icon=codexbar-native
+Terminal=false
+Categories=Utility;
+StartupNotify=false

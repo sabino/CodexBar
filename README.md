@@ -13,6 +13,8 @@
 
 Tiny macOS 14+ menu bar app that keeps **AI coding-provider limits visible** and shows when each window resets. Codex, OpenAI, Claude, Cursor, Gemini, Copilot, Grok, GroqCloud, ElevenLabs, Deepgram, z.ai, MiniMax, Kiro, Zed, Vertex AI, Augment, OpenRouter, LiteLLM, LLM Proxy, Codebuff, Command Code, ClinePass, AWS Bedrock, and many newer coding providers. One status item per provider, or Merge Icons mode with a provider switcher. No Dock icon, minimal UI, dynamic bar icons.
 
+> **Native cross-platform fork:** [`native/`](native/) contains the new Rust + Slint tray app for Linux, macOS, and Windows. It uses one shared UI/codebase, compiles to a native binary, and embeds no Chromium, Node.js, Electron, or WebView runtime. The first working slice supports Codex OAuth usage; it is not yet feature-equivalent to the macOS app. On Ubuntu/Regolith, run `native/scripts/install-linux.sh` after building, or see the [native README](native/README.md).
+
 <img src="docs/codexbar.png" alt="CodexBar menu popover with provider tiles, usage bars, and reset countdowns" width="520" />
 
 ## Why

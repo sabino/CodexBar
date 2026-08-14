@@ -1,0 +1,35 @@
+[package]
+name = "codexbar-native"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.92"
+license = "MIT"
+publish = false
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+slint = { version = "=1.17.1", default-features = false, features = [
+    "backend-winit",
+    "compat-1-2",
+    "renderer-software",
+    "software-renderer-systemfonts",
+    "std",
+    "system-tray",
+] }
+thiserror = "2"
+ureq = { version = "3.4", features = ["json"] }
+webbrowser = "1.0"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem"] }
+
+[build-dependencies]
+slint-build = "=1.17.1"
+
+[profile.release]
+lto = "thin"
+opt-level = "s"
+panic = "abort"
+strip = true

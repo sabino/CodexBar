@@ -1,0 +1,13 @@
+[Unit]
+Description=StatusNotifierItem to XEmbed tray bridge
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/snixembed
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target
