@@ -778,7 +778,8 @@ extension CostUsageScanner {
 
         let sessionAlreadyContributed = cached.sessionId.map { state.contributingSessionIds.contains($0) } ?? false
         let cachedRows = cached.codexRows ?? []
-        if Self.cachedCodexRowsNeedIdentityRescan(cached) {
+        let rowsAreHydrated = cached.codexLazyStorageState?.rowsHydrated != false
+        if rowsAreHydrated, Self.cachedCodexRowsNeedIdentityRescan(cached) {
             return false
         }
         if let parentSessionId = cached.forkedFromId {
@@ -789,6 +790,25 @@ extension CostUsageScanner {
                 else { return false }
                 guard cachedDependencyKey == currentDependencyKey else { return false }
             }
+        }
+
+        if !rowsAreHydrated {
+            // This entry was already canonicalized and deduplicated when it was persisted. A
+            // metadata-identical file can remain aggregate-only; hydrate only when a duplicate
+            // session encountered in this pass needs row-level reconciliation or when pricing
+            // metadata must actually be rebuilt.
+            guard !sessionAlreadyContributed,
+                  cached.sessionId.map({ !context.resources.duplicateSessionIDs.contains($0) }) ?? true,
+                  !Self.needsCodexPricingMetadata(cached, range: context.range)
+            else { return false }
+            cache.files[input.metadata.path] = cached
+            Self.rememberScannedCodexFile(
+                input: input,
+                session: CodexScannedSession(id: cached.sessionId, days: cached.days),
+                rows: [],
+                context: context,
+                state: &state)
+            return true
         }
 
         if sessionAlreadyContributed {
@@ -834,6 +854,12 @@ extension CostUsageScanner {
         _ cached: CostUsageFileUsage,
         context: CodexFileScanContext) -> Bool
     {
+        if cached.codexLazyStorageState?.rowsHydrated == false,
+           cached.codexLazyStorageState?.storedHasTurnIDs == true,
+           !context.changedPriorityTurnIDs.isEmpty
+        {
+            return true
+        }
         if cached.codexTurnIDs == nil {
             return context.requiresTurnIDCache
         }

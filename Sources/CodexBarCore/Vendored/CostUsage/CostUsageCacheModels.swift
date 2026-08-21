@@ -247,7 +247,25 @@ struct CostUsageCodexPreviousReport: Codable, Equatable {
     }
 }
 
-struct CostUsageFileUsage: Codable, Equatable {
+/// Scanner-only bookkeeping for a cache entry restored without its large raw row arrays.
+///
+/// The SQLite day aggregates remain authoritative for unchanged files. Raw rows and token
+/// snapshots are hydrated only when a file is selected for append/rescan or when a fork needs
+/// its parent's event stream. This state is never written as part of the SQLite file payload.
+struct CostUsageCodexLazyStorageState: Codable, Equatable, @unchecked Sendable {
+    var rowsHydrated: Bool
+    var tokenSnapshotsHydrated: Bool
+    var storedHasRows: Bool
+    var storedHasTurnIDs: Bool
+    var storedHasTokenSnapshots: Bool
+    var persistedAggregates: [CostUsageStoreDayAggregate]
+
+    var hasUnhydratedDetails: Bool {
+        !self.rowsHydrated || !self.tokenSnapshotsHydrated
+    }
+}
+
+struct CostUsageFileUsage: Codable, Equatable, @unchecked Sendable {
     var mtimeUnixMs: Int64
     var size: Int64
     var days: [String: [String: [Int]]]
@@ -288,10 +306,15 @@ struct CostUsageFileUsage: Codable, Equatable {
     var codexJSONLResumeState: CostUsageJsonl.ResumeState?
     var codexBufferedSubagentLines: [CostUsageScanner.CodexBufferedFastLine]?
     var codexBufferedUnresolvedForkLines: [CostUsageScanner.CodexBufferedFastLine]?
+    var codexLazyStorageState: CostUsageCodexLazyStorageState?
 
     var hasBufferedCodexForkRetryLines: Bool {
         self.codexBufferedSubagentLines?.isEmpty == false
             || self.codexBufferedUnresolvedForkLines?.isEmpty == false
+    }
+
+    var hasUnhydratedCodexDetails: Bool {
+        self.codexLazyStorageState?.hasUnhydratedDetails == true
     }
 }
 

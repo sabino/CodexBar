@@ -97,10 +97,93 @@ extension CostUsageStore {
         }
     }
 
+    func readScanProgress() -> CostUsageStoreScanProgress {
+        let empty = CostUsageStoreScanProgress(
+            metadata: .empty,
+            discoveryState: nil,
+            lookbackState: nil,
+            fileCount: 0,
+            incompleteFileCount: 0,
+            parsedBytes: 0,
+            sourceBytes: 0,
+            latestFileUpdateUnixMs: 0,
+            bufferedLineCount: 0)
+        return self.withDatabase(default: empty) { database in
+            try Self.inReadTransaction(database) {
+                let metadata = try Self.readSingleton(
+                    CostUsageStoreMetadata.self,
+                    database: database,
+                    table: "scan_metadata") ?? .empty
+                let discovery = try Self.readSingleton(
+                    CostUsageStoreDiscoveryState.self,
+                    database: database,
+                    table: "discovery_state")
+                let lookback = try Self.readSingleton(
+                    CostUsageStoreLookbackState.self,
+                    database: database,
+                    table: "lookback_state")
+
+                let fileStatement = try Self.prepare(database, """
+                SELECT COUNT(*),
+                       COALESCE(SUM(CASE WHEN scan_complete = 0 THEN 1 ELSE 0 END), 0),
+                       COALESCE(SUM(COALESCE(parsed_bytes, 0)), 0),
+                       COALESCE(SUM(size), 0),
+                       COALESCE(MAX(updated_at_ms), 0)
+                FROM files
+                """)
+                defer { sqlite3_finalize(fileStatement) }
+                guard sqlite3_step(fileStatement) == SQLITE_ROW else {
+                    throw StoreError.invalidData
+                }
+
+                let bufferedStatement = try Self.prepare(
+                    database,
+                    "SELECT COUNT(*) FROM buffered_lines")
+                defer { sqlite3_finalize(bufferedStatement) }
+                guard sqlite3_step(bufferedStatement) == SQLITE_ROW else {
+                    throw StoreError.invalidData
+                }
+
+                return CostUsageStoreScanProgress(
+                    metadata: metadata,
+                    discoveryState: discovery,
+                    lookbackState: lookback,
+                    fileCount: Int(sqlite3_column_int64(fileStatement, 0)),
+                    incompleteFileCount: Int(sqlite3_column_int64(fileStatement, 1)),
+                    parsedBytes: sqlite3_column_int64(fileStatement, 2),
+                    sourceBytes: sqlite3_column_int64(fileStatement, 3),
+                    latestFileUpdateUnixMs: sqlite3_column_int64(fileStatement, 4),
+                    bufferedLineCount: Int(sqlite3_column_int64(bufferedStatement, 0)))
+            }
+        }
+    }
+
     func readSnapshot() -> CostUsageStoreSnapshot {
         self.withDatabase(default: Self.emptySnapshot) { database in
             try Self.inReadTransaction(database) {
                 try Self.readSnapshot(database)
+            }
+        }
+    }
+
+    /// Scanner restore that deliberately leaves the large raw event tables on disk. File/day
+    /// aggregates, resumable parser state, fork buffers, and accumulators are enough to decide
+    /// which paths need work; selected paths hydrate their raw details through
+    /// `readRawFileDetails(path:)` immediately before append/rescan.
+    func readCompactScannerSnapshot() -> CostUsageStoreSnapshot {
+        self.withDatabase(default: Self.emptySnapshot) { database in
+            try Self.inReadTransaction(database) {
+                try Self.readCompactScannerSnapshot(database)
+            }
+        }
+    }
+
+    func readRawFileDetails(path: String) -> CostUsageStoreRawFileDetails? {
+        self.withDatabase(default: nil) { database in
+            try Self.inReadTransaction(database) {
+                try CostUsageStoreRawFileDetails(
+                    tokenSnapshots: Self.readTokenSnapshots(database, path: path),
+                    usageRows: Self.readUsageRows(database, path: path))
             }
         }
     }
@@ -110,6 +193,21 @@ extension CostUsageStore {
     func readSnapshotInCurrentTransaction() -> CostUsageStoreSnapshot {
         self.withDatabase(default: Self.emptySnapshot) { database in
             try Self.readSnapshot(database)
+        }
+    }
+
+    func readCompactScannerSnapshotInCurrentTransaction() -> CostUsageStoreSnapshot {
+        self.withDatabase(default: Self.emptySnapshot) { database in
+            try Self.readCompactScannerSnapshot(database)
+        }
+    }
+
+    func readDetailCountsInCurrentTransaction(paths: Set<String>) -> CostUsageStoreDetailCounts {
+        self.withDatabase(default: CostUsageStoreDetailCounts(
+            tokenSnapshotsByPath: [:],
+            usageRowsByPath: [:]))
+        { database in
+            try Self.readDetailCounts(database, paths: paths)
         }
     }
 
@@ -212,6 +310,61 @@ extension CostUsageStore {
                 database: database,
                 table: "lookback_state"),
             accumulators: self.readAccumulators(database, path: nil))
+    }
+
+    private static func readCompactScannerSnapshot(_ database: OpaquePointer) throws -> CostUsageStoreSnapshot {
+        try CostUsageStoreSnapshot(
+            metadata: self.readSingleton(
+                CostUsageStoreMetadata.self,
+                database: database,
+                table: "scan_metadata") ?? .empty,
+            files: self.readFiles(database),
+            tokenSnapshots: [],
+            usageRows: [],
+            fileDayAggregates: self.readFileDayAggregates(database, path: nil),
+            dayAggregates: self.readDayAggregates(database, sinceDay: nil, untilDay: nil),
+            forkLineage: self.readForkLineage(database, path: nil),
+            bufferedLines: self.readBufferedLines(database, path: nil, kind: nil),
+            discoveryState: self.readSingleton(
+                CostUsageStoreDiscoveryState.self,
+                database: database,
+                table: "discovery_state"),
+            lookbackState: self.readSingleton(
+                CostUsageStoreLookbackState.self,
+                database: database,
+                table: "lookback_state"),
+            accumulators: self.readAccumulators(database, path: nil))
+    }
+
+    private static func readDetailCounts(
+        _ database: OpaquePointer,
+        paths: Set<String>) throws -> CostUsageStoreDetailCounts
+    {
+        guard !paths.isEmpty else {
+            return CostUsageStoreDetailCounts(tokenSnapshotsByPath: [:], usageRowsByPath: [:])
+        }
+
+        func counts(table: String) throws -> [String: Int] {
+            let statement = try self.prepare(database, """
+            SELECT COUNT(*)
+            FROM \(table)
+            WHERE file_id = (SELECT id FROM files WHERE path = ?)
+            """)
+            defer { sqlite3_finalize(statement) }
+            var values: [String: Int] = [:]
+            for path in paths {
+                sqlite3_reset(statement)
+                sqlite3_clear_bindings(statement)
+                self.bind(path, to: statement, at: 1)
+                guard sqlite3_step(statement) == SQLITE_ROW else { throw StoreError.invalidData }
+                values[path] = Int(sqlite3_column_int64(statement, 0))
+            }
+            return values
+        }
+
+        return try CostUsageStoreDetailCounts(
+            tokenSnapshotsByPath: counts(table: "token_snapshots"),
+            usageRowsByPath: counts(table: "usage_rows"))
     }
 
     private static let fileSelectSQL = """

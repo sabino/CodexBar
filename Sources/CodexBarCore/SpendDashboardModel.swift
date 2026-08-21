@@ -1,29 +1,33 @@
-import CodexBarCore
 import Foundation
 
 // swiftlint:disable:next type_body_length
-struct SpendDashboardModel: Equatable, Sendable {
-    enum SourceKind: String, Sendable, Equatable {
+package struct SpendDashboardModel: Equatable, Sendable {
+    package enum SourceKind: String, Sendable, Equatable {
         case native
         case openCodex
     }
 
-    static let openCodexSourceID = "opencodex"
-    struct ProviderInput: Sendable {
-        let id: String
-        let provider: UsageProvider
-        let displayName: String
-        let modelProviderName: String
-        let snapshot: CostUsageTokenSnapshot
-        let tokenActivityCache: CostUsageTokenActivityCache?
+    package static let openCodexSourceID = "opencodex"
+    package struct ProviderInput: Sendable {
+        package let id: String
+        package let provider: UsageProvider
+        package let displayName: String
+        package let modelProviderName: String
+        package let snapshot: CostUsageTokenSnapshot
+        package let tokenActivityCache: CostUsageTokenActivityCache?
+        /// Allows a renderer to show the real rows already indexed while the native Codex
+        /// scanner is still establishing complete historical coverage. The default remains
+        /// strict so the original macOS dashboard semantics do not change.
+        package let includesIndexedPartialHistory: Bool
 
-        init(
+        package init(
             id: String? = nil,
             provider: UsageProvider,
             displayName: String,
             modelProviderName: String? = nil,
             snapshot: CostUsageTokenSnapshot,
             tokenActivityCache: CostUsageTokenActivityCache? = nil,
+            includesIndexedPartialHistory: Bool = false,
             sourceKind: SpendDashboardModel.SourceKind = .native)
         {
             self.id = id ?? provider.rawValue
@@ -32,28 +36,29 @@ struct SpendDashboardModel: Equatable, Sendable {
             self.modelProviderName = modelProviderName ?? displayName
             self.snapshot = snapshot
             self.tokenActivityCache = tokenActivityCache
+            self.includesIndexedPartialHistory = includesIndexedPartialHistory
             self.sourceKind = sourceKind
         }
 
-        let sourceKind: SpendDashboardModel.SourceKind
+        package let sourceKind: SpendDashboardModel.SourceKind
     }
 
-    struct SourceFilterItem: Identifiable, Equatable, Sendable {
-        let id: String
-        let displayName: String
+    package struct SourceFilterItem: Identifiable, Equatable, Sendable {
+        package let id: String
+        package let displayName: String
     }
 
-    struct ProviderRow: Identifiable, Equatable, Sendable {
-        let id: String
-        let rank: Int
-        let provider: UsageProvider
-        let displayName: String
-        let totalTokens: Int?
-        let totalCost: Double?
-        let coveredDayCount: Int
-        let sourceKind: SourceKind
+    package struct ProviderRow: Identifiable, Equatable, Sendable {
+        package let id: String
+        package let rank: Int
+        package let provider: UsageProvider
+        package let displayName: String
+        package let totalTokens: Int?
+        package let totalCost: Double?
+        package let coveredDayCount: Int
+        package let sourceKind: SourceKind
 
-        init(
+        package init(
             id: String,
             rank: Int,
             provider: UsageProvider,
@@ -74,20 +79,20 @@ struct SpendDashboardModel: Equatable, Sendable {
         }
     }
 
-    struct ModelRow: Identifiable, Equatable, Sendable {
-        let rank: Int
-        let provider: UsageProvider
-        let providerName: String
-        let modelName: String
-        let totalTokens: Int?
-        let totalCost: Double?
-        let tokenMix: CostUsageTokenMix
+    package struct ModelRow: Identifiable, Equatable, Sendable {
+        package let rank: Int
+        package let provider: UsageProvider
+        package let providerName: String
+        package let modelName: String
+        package let totalTokens: Int?
+        package let totalCost: Double?
+        package let tokenMix: CostUsageTokenMix
 
-        var id: String {
+        package var id: String {
             "\(self.provider.rawValue):\(self.modelName)"
         }
 
-        init(
+        package init(
             rank: Int,
             provider: UsageProvider,
             providerName: String,
@@ -108,89 +113,89 @@ struct SpendDashboardModel: Equatable, Sendable {
 
     /// A project roll-up scoped to the requested window. Projects are keyed per source so
     /// the same repository used under two Codex accounts stays attributed to each subscription.
-    struct ProjectRow: Identifiable, Equatable, Sendable {
-        let rank: Int
-        let provider: UsageProvider
-        let providerName: String
-        let sourceID: String
-        let projectName: String
-        let path: String?
-        let totalTokens: Int?
-        let totalCost: Double?
+    package struct ProjectRow: Identifiable, Equatable, Sendable {
+        package let rank: Int
+        package let provider: UsageProvider
+        package let providerName: String
+        package let sourceID: String
+        package let projectName: String
+        package let path: String?
+        package let totalTokens: Int?
+        package let totalCost: Double?
 
-        var id: String {
+        package var id: String {
             "\(self.sourceID):\(self.projectName)"
         }
     }
 
-    struct DailyPoint: Identifiable, Equatable, Sendable {
-        let sourceID: String
-        let provider: UsageProvider
-        let providerName: String
-        let day: Date
-        let cost: Double
-        let stackStart: Double
-        let stackEnd: Double
+    package struct DailyPoint: Identifiable, Equatable, Sendable {
+        package let sourceID: String
+        package let provider: UsageProvider
+        package let providerName: String
+        package let day: Date
+        package let cost: Double
+        package let stackStart: Double
+        package let stackEnd: Double
 
-        var id: String {
+        package var id: String {
             "\(self.sourceID):\(Int(self.day.timeIntervalSince1970))"
         }
     }
 
-    struct TokenActivityPoint: Identifiable, Equatable, Sendable {
-        let day: Date
+    package struct TokenActivityPoint: Identifiable, Equatable, Sendable {
+        package let day: Date
         /// `nil` means at least one included source cannot establish coverage for this day.
         /// This must stay distinct from a proven zero so the heatmap does not fabricate inactivity.
-        let totalTokens: Int?
+        package let totalTokens: Int?
         /// `false` means at least one source never scanned this day, so the gap is a window edge
         /// rather than missing data. A `nil` total with `true` means every source scanned the day
         /// and still cannot report it, which is a real gap the heatmap must keep visible.
-        let isScanned: Bool
+        package let isScanned: Bool
 
-        init(day: Date, totalTokens: Int?, isScanned: Bool = true) {
+        package init(day: Date, totalTokens: Int?, isScanned: Bool = true) {
             self.day = day
             self.totalTokens = totalTokens
             self.isScanned = isScanned
         }
 
-        var id: Date {
+        package var id: Date {
             self.day
         }
     }
 
-    enum ModelHistoryCompleteness: Equatable, Sendable {
+    package enum ModelHistoryCompleteness: Equatable, Sendable {
         case complete
         case incomplete
     }
 
-    struct CurrencyGroup: Identifiable, Equatable, Sendable {
-        let currencyCode: String
-        let providers: [ProviderRow]
-        let models: [ModelRow]
-        let dailyPoints: [DailyPoint]
-        let totalTokens: Int?
-        let totalCost: Double?
-        let coveredDayCount: Int
-        let chartDomain: ClosedRange<Date>
-        let modelHistoryCompleteness: ModelHistoryCompleteness
-        let tokenMix: CostUsageTokenMix
-        let coverage: CostUsageCoverageCounts
-        let provenance: CostProvenance
-        let meteredCost: Double?
-        let sessions: [SessionRow]
-        let projects: [ProjectRow]
-        let overflowModelCount: Int
-        let displayedModels: [ModelRow]
-        let selectedDay: Date?
-        let hourlyPoints: [HourlyPoint]
-        let hourlyChartDomain: ClosedRange<Date>?
-        let timeZone: TimeZone
+    package struct CurrencyGroup: Identifiable, Equatable, Sendable {
+        package let currencyCode: String
+        package let providers: [ProviderRow]
+        package let models: [ModelRow]
+        package let dailyPoints: [DailyPoint]
+        package let totalTokens: Int?
+        package let totalCost: Double?
+        package let coveredDayCount: Int
+        package let chartDomain: ClosedRange<Date>
+        package let modelHistoryCompleteness: ModelHistoryCompleteness
+        package let tokenMix: CostUsageTokenMix
+        package let coverage: CostUsageCoverageCounts
+        package let provenance: CostProvenance
+        package let meteredCost: Double?
+        package let sessions: [SessionRow]
+        package let projects: [ProjectRow]
+        package let overflowModelCount: Int
+        package let displayedModels: [ModelRow]
+        package let selectedDay: Date?
+        package let hourlyPoints: [HourlyPoint]
+        package let hourlyChartDomain: ClosedRange<Date>?
+        package let timeZone: TimeZone
 
-        var id: String {
+        package var id: String {
             self.currencyCode
         }
 
-        init(
+        package init(
             currencyCode: String,
             providers: [ProviderRow],
             models: [ModelRow],
@@ -235,44 +240,44 @@ struct SpendDashboardModel: Equatable, Sendable {
             self.timeZone = timeZone
         }
 
-        static let modelRowDisplayLimit = 8
+        package static let modelRowDisplayLimit = 8
     }
 
-    struct SessionRow: Identifiable, Equatable, Sendable {
-        let id: String
-        let sourceID: String
-        let provider: UsageProvider
-        let displayName: String
-        let lastActivity: Date
-        let totalTokens: Int?
-        let totalCost: Double?
-        let modelName: String?
+    package struct SessionRow: Identifiable, Equatable, Sendable {
+        package let id: String
+        package let sourceID: String
+        package let provider: UsageProvider
+        package let displayName: String
+        package let lastActivity: Date
+        package let totalTokens: Int?
+        package let totalCost: Double?
+        package let modelName: String?
     }
 
-    struct HourlyPoint: Identifiable, Equatable, Sendable {
-        let sourceID: String
-        let provider: UsageProvider
-        let providerName: String
-        let hour: Date
-        let cost: Double
-        let stackStart: Double
-        let stackEnd: Double
+    package struct HourlyPoint: Identifiable, Equatable, Sendable {
+        package let sourceID: String
+        package let provider: UsageProvider
+        package let providerName: String
+        package let hour: Date
+        package let cost: Double
+        package let stackStart: Double
+        package let stackEnd: Double
 
-        var id: String {
+        package var id: String {
             "\(self.sourceID):\(Int(self.hour.timeIntervalSince1970))"
         }
     }
 
-    let requestedDays: Int
-    let groups: [CurrencyGroup]
-    let availableSources: [SourceFilterItem]
-    let tokenActivity: [TokenActivityPoint]
-    let selectedDay: Date?
+    package let requestedDays: Int
+    package let groups: [CurrencyGroup]
+    package let availableSources: [SourceFilterItem]
+    package let tokenActivity: [TokenActivityPoint]
+    package let selectedDay: Date?
 
-    static let tokenActivityDayCount = 365
-    static let modelRowDisplayLimit = 8
+    package static let tokenActivityDayCount = 365
+    package static let modelRowDisplayLimit = 8
 
-    init(
+    package init(
         requestedDays: Int,
         groups: [CurrencyGroup],
         availableSources: [SourceFilterItem] = [],
@@ -286,7 +291,7 @@ struct SpendDashboardModel: Equatable, Sendable {
         self.selectedDay = selectedDay
     }
 
-    static func build(
+    package static func build(
         inputs: [ProviderInput],
         requestedDays: Int,
         now: Date,
@@ -296,7 +301,7 @@ struct SpendDashboardModel: Equatable, Sendable {
         hideNativeCodexWhenOpenCodexPresent: Bool = false,
         selectedDay: Date? = nil) -> Self
     {
-        let days = max(1, min(SpendDashboardSource.scanDays, requestedDays))
+        let days = max(1, min(365, requestedDays))
         let calculationCalendar = Self.gregorianCalendar(timeZone: calendar.timeZone)
         let availableSources = inputs
             .map { SourceFilterItem(id: $0.id, displayName: $0.displayName) }
@@ -341,7 +346,7 @@ struct SpendDashboardModel: Equatable, Sendable {
             selectedDay: selectedDay.map { calculationCalendar.startOfDay(for: $0) })
     }
 
-    static func visibleInputs(
+    package static func visibleInputs(
         _ inputs: [ProviderInput],
         hiddenSourceIDs: Set<String>,
         hideNativeCodexWhenOpenCodexPresent: Bool) -> [ProviderInput]
@@ -943,7 +948,8 @@ struct SpendDashboardModel: Equatable, Sendable {
         }
 
         let hasCompleteHistory = input.tokenActivityCache != nil
-            || Self.hasCompleteTokenHistory(input, displayCalendar: calendar)
+            || (input.snapshot.historyCoverageIsEstablished
+                && Self.hasCompleteTokenHistory(input, displayCalendar: calendar))
         let aggregateIsInconsistent = input.tokenActivityCache == nil
             && input.snapshot.last30DaysTokens != nil
             && !hasCompleteHistory
@@ -999,12 +1005,35 @@ struct SpendDashboardModel: Equatable, Sendable {
         bounds: ClosedRange<Date>,
         displayCalendar: Calendar) -> ClosedRange<Date>?
     {
-        guard input.snapshot.historyCoverageIsEstablished else { return nil }
-        let sourceCoverage = Self.sourceCoverageInterval(input: input, displayCalendar: displayCalendar)
+        let sourceCoverage: ClosedRange<Date>
+        if input.snapshot.historyCoverageIsEstablished {
+            sourceCoverage = Self.sourceCoverageInterval(input: input, displayCalendar: displayCalendar)
+        } else if input.includesIndexedPartialHistory,
+                  let indexedCoverage = Self.indexedCoverageInterval(
+                      input: input,
+                      displayCalendar: displayCalendar)
+        {
+            sourceCoverage = indexedCoverage
+        } else {
+            return nil
+        }
         let overlapStart = max(bounds.lowerBound, sourceCoverage.lowerBound)
         let overlapEnd = min(bounds.upperBound, sourceCoverage.upperBound)
         guard overlapStart <= overlapEnd else { return nil }
         return overlapStart...overlapEnd
+    }
+
+    /// The partial mode never claims the full requested window. It exposes only the span that
+    /// contains actual persisted day rows, and callers must label that presentation as partial.
+    private static func indexedCoverageInterval(
+        input: ProviderInput,
+        displayCalendar: Calendar) -> ClosedRange<Date>?
+    {
+        let indexedDays = input.snapshot.daily.compactMap {
+            Self.day($0.date, provider: input.provider, displayCalendar: displayCalendar)
+        }
+        guard let first = indexedDays.min(), let last = indexedDays.max() else { return nil }
+        return first...last
     }
 
     private static func sourceCoverageInterval(
@@ -1252,16 +1281,16 @@ struct SpendDashboardModel: Equatable, Sendable {
 }
 
 extension SpendDashboardModel.CurrencyGroup {
-    var pricedProviderCount: Int {
+    package var pricedProviderCount: Int {
         self.providers.count { $0.totalCost != nil }
     }
 
-    var hasPartialCost: Bool {
+    package var hasPartialCost: Bool {
         let values = self.providers.map(\.totalCost)
         return values.contains { $0 != nil } && values.contains { $0 == nil }
     }
 
-    var hasPartialTokens: Bool {
+    package var hasPartialTokens: Bool {
         let values = self.providers.map(\.totalTokens)
         return values.contains { $0 != nil } && values.contains { $0 == nil }
     }

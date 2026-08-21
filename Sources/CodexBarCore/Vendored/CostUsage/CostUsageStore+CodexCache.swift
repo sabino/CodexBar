@@ -55,6 +55,15 @@ extension CostUsageStore {
         return Self.cache(from: snapshot)
     }
 
+    func loadCodexCacheForScan(calendar: Calendar) -> CostUsageCache {
+        _ = self.removeLegacyCodexArtifactIfPresent()
+        let snapshot = self.readCompactScannerSnapshot()
+        guard snapshot.metadata.timeZoneIdentifier == nil
+            || snapshot.metadata.timeZoneIdentifier == calendar.timeZone.identifier
+        else { return CostUsageCache() }
+        return Self.cache(from: snapshot, rawDetailsHydrated: false)
+    }
+
     @discardableResult
     func saveCodexCache(
         _ cache: CostUsageCache,
@@ -67,6 +76,14 @@ extension CostUsageStore {
     {
         var cache = cache
         Self.reconcileCompletedCodexCatchUp(cache: &cache)
+        if cache.files.values.contains(where: { $0.codexLazyStorageState != nil }) {
+            return self.saveCompactCodexCache(
+                cache,
+                calendar: calendar,
+                requestedScanWindow: requestedScanWindow,
+                reportWindow: reportWindow,
+                budgets: (rows: rowBudget, fileBytes: fileBudgetBytes))
+        }
         let previous = self.readSnapshot()
         let budgetProtectionWindow = Self.budgetProtectionWindow(
             cache: cache,
@@ -119,6 +136,7 @@ extension CostUsageStore {
         }
         let canReuseStoredRows = previous.metadata.timeZoneIdentifier == calendar.timeZone.identifier
         let previousFilesByPath = Dictionary(uniqueKeysWithValues: previous.files.map { ($0.path, $0) })
+        let previousAccumulatorsByPath = Dictionary(uniqueKeysWithValues: previous.accumulators.map { ($0.path, $0) })
         let snapshotCountsByPath = previous.tokenSnapshots
             .reduce(into: [String: Int]()) { $0[$1.path, default: 0] += 1 }
         let rowCountsByPath = previous.usageRows.reduce(into: [String: Int]()) { $0[$1.path, default: 0] += 1 }
@@ -141,6 +159,7 @@ extension CostUsageStore {
                 usage: usage,
                 baseline: PersistedFileBaseline(
                     file: previousFilesByPath[path],
+                    accumulator: previousAccumulatorsByPath[path],
                     snapshotCount: snapshotCountsByPath[path] ?? 0,
                     rowCount: rowCountsByPath[path] ?? 0,
                     canReuseRows: canReuseStoredRows),
@@ -162,6 +181,82 @@ extension CostUsageStore {
         let result = self.enforceBudgets(
             maxRows: rowBudget,
             maxFileBytes: fileBudgetBytes,
+            requestedSinceDay: budgetProtectionWindow.sinceKey,
+            requestedUntilDay: budgetProtectionWindow.untilKey,
+            calendar: calendar)
+        if result.catchUpRequired, self.fetchMetadata().previousReportPayload == nil,
+           let previous = Self.previousReport(cache: cache, calendar: calendar, reportWindow: reportWindow)
+        {
+            var metadata = self.fetchMetadata()
+            metadata.previousReportPayload = try? JSONEncoder().encode(previous)
+            _ = self.setMetadata(metadata)
+        }
+        return result
+    }
+
+    /// Persists a scanner cache restored from compact SQLite state. Unchanged files retain their
+    /// raw rows and token snapshots in place; only entries hydrated for real work participate in
+    /// append/replace planning. The baseline and detail counts are read under the writer lock so
+    /// another process cannot race this decision.
+    private func saveCompactCodexCache(
+        _ cache: CostUsageCache,
+        calendar: Calendar,
+        requestedScanWindow: (sinceKey: String, untilKey: String),
+        reportWindow: (sinceKey: String, untilKey: String)?,
+        budgets: (rows: Int, fileBytes: Int64)) -> CostUsageStoreBudgetResult
+    {
+        let budgetProtectionWindow = Self.budgetProtectionWindow(
+            cache: cache,
+            requestedScanWindow: requestedScanWindow)
+        guard self.beginSaveTransaction() else {
+            return CostUsageStoreBudgetResult(
+                deletedRows: 0,
+                rowCount: cache.files.count,
+                fileBytes: 0,
+                catchUpRequired: true)
+        }
+
+        let previous = self.readCompactScannerSnapshotInCurrentTransaction()
+        let detailCountPaths = Set(cache.files.compactMap { path, usage -> String? in
+            guard let storage = usage.codexLazyStorageState else { return path }
+            return storage.hasUnhydratedDetails ? nil : path
+        })
+        let detailCounts = self.readDetailCountsInCurrentTransaction(paths: detailCountPaths)
+        let canReuseStoredRows = previous.metadata.timeZoneIdentifier == calendar.timeZone.identifier
+        let previousFilesByPath = Dictionary(uniqueKeysWithValues: previous.files.map { ($0.path, $0) })
+        let previousAccumulatorsByPath = Dictionary(uniqueKeysWithValues: previous.accumulators.map { ($0.path, $0) })
+
+        self.deleteRemovedFiles(previous: previous, cache: cache)
+        var persistedFiles = 0
+        for (path, usage) in cache.files.sorted(by: { $0.key < $1.key }) {
+            self.persistFile(
+                path: path,
+                usage: usage,
+                baseline: PersistedFileBaseline(
+                    file: previousFilesByPath[path],
+                    accumulator: previousAccumulatorsByPath[path],
+                    snapshotCount: detailCounts.tokenSnapshotsByPath[path] ?? 0,
+                    rowCount: detailCounts.usageRowsByPath[path] ?? 0,
+                    canReuseRows: canReuseStoredRows),
+                calendar: calendar)
+            persistedFiles += 1
+            Self.saveCycleCheckpointForTesting?(persistedFiles)
+        }
+        _ = self.replaceDayAggregates(Self.globalAggregates(cache: cache))
+        _ = self.setMetadata(Self.metadata(cache: cache, calendar: calendar))
+        _ = self.setDiscoveryState(Self.discoveryState(cache.codexSessionDiscovery))
+        _ = self.setLookbackState(Self.lookbackState(cache.codexActiveLookbackState))
+        guard self.endSaveTransaction() else {
+            return CostUsageStoreBudgetResult(
+                deletedRows: 0,
+                rowCount: previous.files.count,
+                fileBytes: 0,
+                catchUpRequired: true)
+        }
+
+        let result = self.enforceBudgets(
+            maxRows: budgets.rows,
+            maxFileBytes: budgets.fileBytes,
             requestedSinceDay: budgetProtectionWindow.sinceKey,
             requestedUntilDay: budgetProtectionWindow.untilKey,
             calendar: calendar)
@@ -257,6 +352,7 @@ extension CostUsageStore {
 
     private struct PersistedFileBaseline {
         var file: CostUsageStoreFile?
+        var accumulator: CostUsageStoreAccumulator?
         var snapshotCount: Int
         var rowCount: Int
         var canReuseRows: Bool
@@ -273,32 +369,12 @@ extension CostUsageStore {
         var validatedCurrentSnapshot = false
     }
 
-    private static func cache(from snapshot: CostUsageStoreSnapshot) -> CostUsageCache {
-        var cache = CostUsageCache()
+    private static func cache(
+        from snapshot: CostUsageStoreSnapshot,
+        rawDetailsHydrated: Bool = true) -> CostUsageCache
+    {
+        var cache = Self.cache(from: snapshot.metadata)
         let metadata = snapshot.metadata
-        cache.lastScanUnixMs = metadata.lastScanUnixMs
-        cache.scanSinceKey = metadata.scanSinceDay
-        cache.scanUntilKey = metadata.scanUntilDay
-        cache.timeZoneIdentifier = metadata.timeZoneIdentifier
-        cache.codexPricingKey = metadata.pricingKey
-        cache.codexPriorityMetadataKey = metadata.priorityMetadataKey
-        cache.codexScanCatchUpPending = metadata.catchUpPending
-        cache.codexScanProcessedBytes = metadata.processedBytes
-        cache.codexScanTotalBytes = metadata.totalBytes
-        cache.codexScanCompletedFiles = metadata.completedFiles
-        cache.codexScanTotalFiles = metadata.totalFiles
-        cache.codexScanInventoryPaths = metadata.scanInventoryPaths
-        cache.roots = metadata.rootMtimes
-        cache.codexProjectMetadataVersion = metadata.projectMetadataVersion
-        cache.codexPreviousReport = metadata.previousReportPayload.flatMap {
-            try? JSONDecoder().decode(CostUsageCodexPreviousReport.self, from: $0)
-        }
-        if let priority = metadata.priorityTurnStatePayload.flatMap({
-            try? JSONDecoder().decode(StoredPriorityState.self, from: $0)
-        }) {
-            cache.codexPriorityTurnKeys = priority.turnKeys
-            cache.codexPriorityTurnIDsByDay = priority.turnIDsByDay
-        }
         cache.codexSessionDiscovery = snapshot.discoveryState.flatMap(Self.discovery(from:))
         cache.codexActiveLookbackState = snapshot.lookbackState.map(Self.lookback(from:))
 
@@ -322,7 +398,15 @@ extension CostUsageStore {
             let rows = (rowsByPath[file.path] ?? []).compactMap {
                 try? JSONDecoder().decode(CostUsageScanner.CodexUsageRow.self, from: $0.payload)
             }
-            let restoredRows = rows.isEmpty ? Self.aggregateRows(from: aggregates) : rows
+            let restoredRows: [CostUsageScanner.CodexUsageRow] = if rows.isEmpty {
+                if rawDetailsHydrated {
+                    Self.aggregateRows(from: aggregates)
+                } else {
+                    aggregates.flatMap(Self.aggregateReportRows(from:))
+                }
+            } else {
+                rows
+            }
             let tokenSnapshots = (snapshotsByPath[file.path] ?? []).map(Self.tokenSnapshot(from:))
             let lineage = lineageByPath[file.path]
             let accumulator = accumulatorByPath[file.path]
@@ -383,11 +467,13 @@ extension CostUsageStore {
                 codexPriorityCostNanos: nil,
                 codexStandardTokens: Self.modeTokens(from: aggregates, priority: false),
                 codexPriorityTokens: Self.modeTokens(from: aggregates, priority: true),
-                codexTurnIDs: details.hasTurnIDs ? CostUsageScanner.codexTurnIDs(rows: rows) ?? [] : nil,
+                codexTurnIDs: details.hasTurnIDs
+                    ? (rawDetailsHydrated ? CostUsageScanner.codexTurnIDs(rows: rows) ?? [] : [])
+                    : nil,
                 codexWorkspaceContentFingerprint: details.workspaceFingerprint,
                 codexRows: details.hasRows ? restoredRows : nil,
-                codexTokenSnapshots: details.hasTokenSnapshots ? tokenSnapshots : nil,
-                codexTokenCheckpoints: details.hasTokenSnapshots
+                codexTokenSnapshots: details.hasTokenSnapshots && rawDetailsHydrated ? tokenSnapshots : nil,
+                codexTokenCheckpoints: details.hasTokenSnapshots && rawDetailsHydrated
                     ? CostUsageScanner.codexTokenCheckpoints(for: tokenSnapshots) : nil,
                 codexTokenTimestampsMonotonic: file.scanState.tokenTimestampsMonotonic,
                 codexTokenIndexAnchor: file.anchor.map {
@@ -404,7 +490,14 @@ extension CostUsageStore {
                     try? JSONDecoder().decode(CostUsageJsonl.ResumeState.self, from: $0)
                 },
                 codexBufferedSubagentLines: Self.bufferedLines(buffers, kind: .subagent),
-                codexBufferedUnresolvedForkLines: Self.bufferedLines(buffers, kind: .unresolvedFork))
+                codexBufferedUnresolvedForkLines: Self.bufferedLines(buffers, kind: .unresolvedFork),
+                codexLazyStorageState: rawDetailsHydrated ? nil : CostUsageCodexLazyStorageState(
+                    rowsHydrated: false,
+                    tokenSnapshotsHydrated: false,
+                    storedHasRows: details.hasRows,
+                    storedHasTurnIDs: details.hasTurnIDs,
+                    storedHasTokenSnapshots: details.hasTokenSnapshots,
+                    persistedAggregates: aggregates))
             cache.files[file.path] = usage
         }
         Self.enqueueDeferredCodexIdentityValidation(
@@ -418,6 +511,101 @@ extension CostUsageStore {
             cache: &cache,
             visitLimit: remainingIdentityValidationVisits)
         cache.days = Self.days(from: snapshot.dayAggregates)
+        return cache
+    }
+
+    func hydrateCodexUsage(
+        path: String,
+        usage: CostUsageFileUsage) -> CostUsageFileUsage?
+    {
+        guard var storage = usage.codexLazyStorageState,
+              storage.hasUnhydratedDetails
+        else { return usage }
+        guard let raw = self.readRawFileDetails(path: path) else { return nil }
+
+        let decodedRows = raw.usageRows.compactMap {
+            try? JSONDecoder().decode(CostUsageScanner.CodexUsageRow.self, from: $0.payload)
+        }
+        let rows = decodedRows.isEmpty
+            ? Self.aggregateRows(from: storage.persistedAggregates)
+            : decodedRows
+        let snapshots = raw.tokenSnapshots.map(Self.tokenSnapshot(from:))
+
+        var hydrated = usage
+        hydrated.codexRows = storage.storedHasRows ? rows : nil
+        hydrated.codexTurnIDs = storage.storedHasTurnIDs
+            ? CostUsageScanner.codexTurnIDs(rows: decodedRows) ?? []
+            : nil
+        hydrated.codexTokenSnapshots = storage.storedHasTokenSnapshots ? snapshots : nil
+        hydrated.codexTokenCheckpoints = storage.storedHasTokenSnapshots
+            ? CostUsageScanner.codexTokenCheckpoints(for: snapshots)
+            : nil
+        storage.rowsHydrated = true
+        storage.tokenSnapshotsHydrated = true
+        hydrated.codexLazyStorageState = storage
+        return hydrated
+    }
+
+    private static func cache(from metadata: CostUsageStoreMetadata) -> CostUsageCache {
+        var cache = CostUsageCache()
+        cache.lastScanUnixMs = metadata.lastScanUnixMs
+        cache.scanSinceKey = metadata.scanSinceDay
+        cache.scanUntilKey = metadata.scanUntilDay
+        cache.timeZoneIdentifier = metadata.timeZoneIdentifier
+        cache.codexPricingKey = metadata.pricingKey
+        cache.codexPriorityMetadataKey = metadata.priorityMetadataKey
+        cache.codexScanCatchUpPending = metadata.catchUpPending
+        cache.codexScanProcessedBytes = metadata.processedBytes
+        cache.codexScanTotalBytes = metadata.totalBytes
+        cache.codexScanCompletedFiles = metadata.completedFiles
+        cache.codexScanTotalFiles = metadata.totalFiles
+        cache.codexScanInventoryPaths = metadata.scanInventoryPaths
+        cache.roots = metadata.rootMtimes
+        cache.codexProjectMetadataVersion = metadata.projectMetadataVersion
+        cache.codexPreviousReport = metadata.previousReportPayload.flatMap {
+            try? JSONDecoder().decode(CostUsageCodexPreviousReport.self, from: $0)
+        }
+        if let priority = metadata.priorityTurnStatePayload.flatMap({
+            try? JSONDecoder().decode(StoredPriorityState.self, from: $0)
+        }) {
+            cache.codexPriorityTurnKeys = priority.turnKeys
+            cache.codexPriorityTurnIDsByDay = priority.turnIDsByDay
+        }
+        return cache
+    }
+
+    /// Builds the read-time report working set from bounded day aggregates only. This preserves
+    /// the original report/pricing pipeline while avoiding the per-session token and JSON row
+    /// hydration needed by the incremental scanner itself.
+    static func aggregateReportCache(
+        from report: CostUsageStoreReport,
+        calendar: Calendar) -> CostUsageCache
+    {
+        guard report.metadata.timeZoneIdentifier == nil
+            || report.metadata.timeZoneIdentifier == calendar.timeZone.identifier
+        else { return CostUsageCache() }
+
+        var cache = Self.cache(from: report.metadata)
+        cache.days = Self.days(from: report.aggregates)
+        for (index, aggregate) in report.aggregates.enumerated() {
+            let aggregates = [aggregate]
+            let hasAuthoritativeCost = aggregate.authoritativeCostNanos != 0
+            let rows = Self.aggregateReportRows(from: aggregate)
+            let usage = CostUsageScanner.makeFileUsage(
+                mtimeUnixMs: report.metadata.lastScanUnixMs,
+                size: 0,
+                days: Self.days(from: aggregates),
+                parsedBytes: nil,
+                codexCostCacheComplete: true,
+                codexCostNanos: Self.authoritativeCosts(from: aggregates),
+                codexStandardTokens: hasAuthoritativeCost
+                    ? nil : Self.modeTokens(from: aggregates, priority: false),
+                codexPriorityTokens: hasAuthoritativeCost
+                    ? nil : Self.modeTokens(from: aggregates, priority: true),
+                codexRows: rows,
+                codexScanComplete: true)
+            cache.files["aggregate://\(index)"] = usage
+        }
         return cache
     }
 
@@ -718,10 +906,16 @@ extension CostUsageStore {
         baseline: PersistedFileBaseline,
         calendar: Calendar)
     {
+        let lazyStorage = usage.codexLazyStorageState
+        let rowsHydrated = lazyStorage?.rowsHydrated != false
+        let tokenSnapshotsHydrated = lazyStorage?.tokenSnapshotsHydrated != false
         let sourceSnapshots = usage.codexTokenSnapshots ?? []
         let sourceRows = usage.codexRows ?? []
-        let snapshotCount = sourceSnapshots.count
-        let rowCount = sourceRows.count
+        let snapshotCount = tokenSnapshotsHydrated ? sourceSnapshots.count : baseline.snapshotCount
+        let rowCount = rowsHydrated ? sourceRows.count : baseline.rowCount
+        let nextUsageRowIndex = rowsHydrated
+            ? CostUsageScanner.nextCodexUsageRowIndex(usage.codexRows)
+            : baseline.file?.scanState.nextUsageRowIndex
         let details = StoredFileDetails(
             lastTotals: usage.lastTotals,
             projectPath: usage.projectPath,
@@ -729,9 +923,11 @@ extension CostUsageStore {
             costCacheComplete: usage.codexCostCacheComplete,
             session: usage.codexSession,
             workspaceFingerprint: usage.codexWorkspaceContentFingerprint,
-            hasRows: usage.codexRows != nil,
-            hasTurnIDs: usage.codexTurnIDs != nil,
-            hasTokenSnapshots: usage.codexTokenSnapshots != nil,
+            hasRows: rowsHydrated ? usage.codexRows != nil : lazyStorage?.storedHasRows ?? false,
+            hasTurnIDs: rowsHydrated ? usage.codexTurnIDs != nil : lazyStorage?.storedHasTurnIDs ?? false,
+            hasTokenSnapshots: tokenSnapshotsHydrated
+                ? usage.codexTokenSnapshots != nil
+                : lazyStorage?.storedHasTokenSnapshots ?? false,
             hasSeenRawTotals: usage.seenRawTotals != nil,
             divergentTotals: usage.hasDivergentTotals,
             interleavedTotals: usage.hasInterleavedTotals)
@@ -752,7 +948,7 @@ extension CostUsageStore {
                 isComplete: usage.codexScanComplete != false,
                 resumePayload: usage.codexJSONLResumeState.flatMap { try? JSONEncoder().encode($0) },
                 tokenTimestampsMonotonic: usage.codexTokenTimestampsMonotonic,
-                nextUsageRowIndex: CostUsageScanner.nextCodexUsageRowIndex(usage.codexRows),
+                nextUsageRowIndex: nextUsageRowIndex,
                 lastModel: usage.lastModel,
                 lastTurnID: usage.lastCodexTurnID,
                 fileIdentity: usage.codexScanFileId,
@@ -769,12 +965,16 @@ extension CostUsageStore {
             && baseline.file?.scanState.fileIdentity == file.scanState.fileIdentity
             && oldParsedBytes < newParsedBytes
         let stableCursor = oldParsedBytes == newParsedBytes
-        let snapshotAction = CostUsagePersistencePlanner.action(
-            canReuse: baseline.canReuseRows,
-            stableCursor: stableCursor,
-            appendSafe: appendSafe,
-            persistedCount: baseline.snapshotCount,
-            sourceCount: snapshotCount)
+        let snapshotAction: CostUsagePersistenceAction = if tokenSnapshotsHydrated {
+            CostUsagePersistencePlanner.action(
+                canReuse: baseline.canReuseRows,
+                stableCursor: stableCursor,
+                appendSafe: appendSafe,
+                persistedCount: baseline.snapshotCount,
+                sourceCount: snapshotCount)
+        } else {
+            .reuse
+        }
         let snapshots = snapshotAction.materialize(sourceSnapshots) { index, snapshot in
             Self.tokenSnapshot(path: path, eventIndex: index, snapshot: snapshot, calendar: calendar)
         }
@@ -787,12 +987,16 @@ extension CostUsageStore {
             _ = self.replaceTokenSnapshots(path: path, snapshots: snapshots)
         }
 
-        let rowAction = CostUsagePersistencePlanner.action(
-            canReuse: baseline.canReuseRows,
-            stableCursor: stableCursor,
-            appendSafe: appendSafe,
-            persistedCount: baseline.rowCount,
-            sourceCount: rowCount)
+        let rowAction: CostUsagePersistenceAction = if rowsHydrated {
+            CostUsagePersistencePlanner.action(
+                canReuse: baseline.canReuseRows,
+                stableCursor: stableCursor,
+                appendSafe: appendSafe,
+                persistedCount: baseline.rowCount,
+                sourceCount: rowCount)
+        } else {
+            .reuse
+        }
         let rows: [CostUsageStoreUsageRow] = rowAction.materialize(sourceRows) { index, row in
             guard let payload = try? JSONEncoder().encode(row) else { return nil }
             return CostUsageStoreUsageRow(path: path, rowIndex: index, payload: payload)
@@ -817,8 +1021,10 @@ extension CostUsageStore {
         self.persistBuffers(path: path, usage: usage)
         _ = self.upsertAccumulator(CostUsageStoreAccumulator(
             path: path,
-            eventCount: snapshotCount,
-            nextUsageRowIndex: CostUsageScanner.nextCodexUsageRowIndex(usage.codexRows),
+            eventCount: tokenSnapshotsHydrated
+                ? snapshotCount
+                : baseline.accumulator?.eventCount ?? baseline.snapshotCount,
+            nextUsageRowIndex: nextUsageRowIndex,
             countedTotals: Self.totals(usage.lastCountedTotals),
             rawTotalsBaseline: Self.totals(usage.lastRawTotalsBaseline),
             rawTotalsWatermark: Self.totals(usage.lastRawTotalsWatermark),
@@ -874,6 +1080,11 @@ extension CostUsageStore {
     }
 
     private static func fileAggregates(_ usage: CostUsageFileUsage) -> [CostUsageStoreDayAggregate] {
+        if let storage = usage.codexLazyStorageState,
+           !storage.rowsHydrated
+        {
+            return storage.persistedAggregates
+        }
         var keys = Set<DayModelKey>()
         func addKeys(_ map: [String: [String: some Any]]?) {
             for (day, models) in map ?? [:] {
@@ -1021,6 +1232,90 @@ extension CostUsageStore {
             }
             return rows
         }
+    }
+
+    private static func aggregateReportRows(
+        from aggregate: CostUsageStoreDayAggregate) -> [CostUsageScanner.CodexUsageRow]
+    {
+        let input = Self.int(aggregate.inputTokens)
+        let cached = Self.int(aggregate.cachedTokens)
+        let output = Self.int(aggregate.outputTokens)
+        let reasoning = max(0, min(Self.int(aggregate.reasoningTokens), max(0, output)))
+
+        if aggregate.authoritativeCostNanos != 0 {
+            return [CostUsageScanner.CodexUsageRow(
+                day: aggregate.day,
+                model: aggregate.model,
+                turnID: nil,
+                eventIndex: 0,
+                input: input,
+                cached: cached,
+                output: output,
+                reasoning: reasoning > 0 ? reasoning : nil,
+                knownCostNanos: aggregate.authoritativeCostNanos,
+                pricingModel: aggregate.model,
+                pricingMode: "standard")]
+        }
+
+        let standardInput = Self.int(aggregate.standardInputTokens)
+        let standardCached = Self.int(aggregate.standardCachedTokens)
+        let standardOutput = Self.int(aggregate.standardOutputTokens)
+        let priorityInput = Self.int(aggregate.priorityInputTokens)
+        let priorityCached = Self.int(aggregate.priorityCachedTokens)
+        let priorityOutput = Self.int(aggregate.priorityOutputTokens)
+        func isCanonicalSplit(_ standard: Int, _ priority: Int, total: Int) -> Bool {
+            let (sum, overflow) = standard.addingReportingOverflow(priority)
+            return !overflow && sum == total
+        }
+        let splitIsCanonical = isCanonicalSplit(standardInput, priorityInput, total: input)
+            && isCanonicalSplit(standardCached, priorityCached, total: cached)
+            && isCanonicalSplit(standardOutput, priorityOutput, total: output)
+        guard splitIsCanonical else {
+            return [CostUsageScanner.CodexUsageRow(
+                day: aggregate.day,
+                model: aggregate.model,
+                turnID: nil,
+                eventIndex: 0,
+                input: input,
+                cached: cached,
+                output: output,
+                reasoning: reasoning > 0 ? reasoning : nil,
+                pricingModel: aggregate.model,
+                pricingMode: "standard")]
+        }
+
+        var rows: [CostUsageScanner.CodexUsageRow] = []
+        var remainingReasoning = reasoning
+        func append(input: Int, cached: Int, output: Int, mode: String) {
+            guard input != 0 || cached != 0 || output != 0 else { return }
+            let rowReasoning = min(remainingReasoning, max(0, output))
+            remainingReasoning -= rowReasoning
+            rows.append(CostUsageScanner.CodexUsageRow(
+                day: aggregate.day,
+                model: aggregate.model,
+                turnID: nil,
+                eventIndex: rows.count,
+                input: input,
+                cached: cached,
+                output: output,
+                reasoning: rowReasoning > 0 ? rowReasoning : nil,
+                pricingModel: aggregate.model,
+                pricingMode: mode))
+        }
+        append(
+            input: standardInput,
+            cached: standardCached,
+            output: standardOutput,
+            mode: "standard")
+        append(
+            input: priorityInput,
+            cached: priorityCached,
+            output: priorityOutput,
+            mode: "priority")
+        if rows.isEmpty {
+            append(input: input, cached: cached, output: output, mode: "standard")
+        }
+        return rows
     }
 
     private static func modeTokens(
@@ -1226,8 +1521,37 @@ enum CostUsageStoreAccess {
         return CostUsageStoreLoad(store: store, cache: cache)
     }
 
+    static func loadForScan(cacheRoot: URL?, calendar: Calendar) -> CostUsageStoreLoad {
+        let store = CostUsageStore(cacheRoot: cacheRoot)
+        let cache = store.syncLoadCodexCacheForScan(calendar: calendar)
+        return CostUsageStoreLoad(store: store, cache: cache)
+    }
+
+    static func hydrate(
+        store: CostUsageStore,
+        path: String,
+        usage: CostUsageFileUsage) -> CostUsageFileUsage?
+    {
+        store.syncHydrateCodexUsage(path: path, usage: usage)
+    }
+
     static func read(cacheRoot: URL?, calendar: Calendar = .current) -> CostUsageCache {
         self.load(cacheRoot: cacheRoot, calendar: calendar).cache
+    }
+
+    static func readAggregateReportCache(
+        cacheRoot: URL?,
+        calendar: Calendar,
+        sinceDay: String,
+        untilDay: String) -> CostUsageCache
+    {
+        let store = CostUsageStore(cacheRoot: cacheRoot)
+        let report = store.syncReadReport(sinceDay: sinceDay, untilDay: untilDay)
+        return CostUsageStore.aggregateReportCache(from: report, calendar: calendar)
+    }
+
+    static func readScanProgress(cacheRoot: URL?) -> CostUsageStoreScanProgress {
+        CostUsageStore(cacheRoot: cacheRoot).syncReadScanProgress()
     }
 
     /// Test and maintenance mutation seam for metadata-only edits. Scanner writes should keep

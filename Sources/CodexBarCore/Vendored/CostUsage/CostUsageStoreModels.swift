@@ -213,6 +213,31 @@ struct CostUsageStoreReport: Equatable, Sendable {
     var aggregates: [CostUsageStoreDayAggregate]
 }
 
+struct CostUsageStoreRawFileDetails: Equatable, Sendable {
+    var tokenSnapshots: [CostUsageStoreTokenSnapshot]
+    var usageRows: [CostUsageStoreUsageRow]
+}
+
+struct CostUsageStoreDetailCounts: Equatable, Sendable {
+    var tokenSnapshotsByPath: [String: Int]
+    var usageRowsByPath: [String: Int]
+}
+
+/// Compact scanner state used by status polling. Keep this independent from
+/// `CostUsageStoreSnapshot`: progress checks run between bounded scanner passes and must not
+/// hydrate every persisted token snapshot or usage row merely to decide whether work remains.
+struct CostUsageStoreScanProgress: Equatable, Sendable {
+    var metadata: CostUsageStoreMetadata
+    var discoveryState: CostUsageStoreDiscoveryState?
+    var lookbackState: CostUsageStoreLookbackState?
+    var fileCount: Int
+    var incompleteFileCount: Int
+    var parsedBytes: Int64
+    var sourceBytes: Int64
+    var latestFileUpdateUnixMs: Int64
+    var bufferedLineCount: Int
+}
+
 struct CostUsageStoreSnapshot: Equatable, Sendable {
     var metadata: CostUsageStoreMetadata
     var files: [CostUsageStoreFile]

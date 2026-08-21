@@ -18,6 +18,23 @@ let sqlite3LinkerSettings: [LinkerSetting] = if let sqlite3LibDir, !sqlite3LibDi
     []
 }
 
+#if os(Linux)
+let codexBarCrossBackendDependencies: [Target.Dependency] = [
+    .product(name: "GtkBackend", package: "swift-cross-ui"),
+    .product(name: "Gtk", package: "swift-cross-ui"),
+]
+#elseif os(macOS)
+let codexBarCrossBackendDependencies: [Target.Dependency] = [
+    .product(name: "AppKitBackend", package: "swift-cross-ui"),
+]
+#elseif os(Windows)
+let codexBarCrossBackendDependencies: [Target.Dependency] = [
+    .product(name: "WinUIBackend", package: "swift-cross-ui"),
+]
+#else
+#error("CodexBarCross supports Linux, macOS, and Windows")
+#endif
+
 let package = Package(
     name: "CodexBar",
     defaultLocalization: "en",
@@ -28,6 +45,7 @@ let package = Package(
         var products: [Product] = [
             .library(name: "CodexBarCore", targets: ["CodexBarCore"]),
             .executable(name: "CodexBarCLI", targets: ["CodexBarCLI"]),
+            .executable(name: "CodexBarCross", targets: ["CodexBarCross"]),
             // Offline adaptive-refresh replay harness. Keep the supporting library package-internal.
             .executable(name: "AdaptiveReplayCLI", targets: ["AdaptiveReplayCLI"]),
         ]
@@ -48,6 +66,7 @@ let package = Package(
         .package(url: "https://github.com/steipete/Commander", from: "0.2.1"),
         .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
         .package(url: "https://github.com/apple/swift-log", from: "1.13.2"),
+        .package(url: "https://github.com/moreSwift/swift-cross-ui", .upToNextMinor(from: "0.9.0")),
         .package(url: "https://github.com/sindresorhus/KeyboardShortcuts", from: "2.4.0"),
         .package(url: "https://github.com/zats/Vortex", revision: "ef5392088d4aeb255c4eee83157dbdafcd31bf07"),
         sweetCookieKitDependency,
@@ -98,6 +117,17 @@ let package = Package(
                     .product(name: "Crypto", package: "swift-crypto"),
                 ],
                 path: "Sources/CodexBarCLI",
+                swiftSettings: [
+                    .enableUpcomingFeature("StrictConcurrency"),
+                ],
+                linkerSettings: sqlite3LinkerSettings),
+            .executableTarget(
+                name: "CodexBarCross",
+                dependencies: [
+                    "CodexBarCore",
+                    .product(name: "SwiftCrossUI", package: "swift-cross-ui"),
+                ] + codexBarCrossBackendDependencies,
+                path: "Sources/CodexBarCross",
                 swiftSettings: [
                     .enableUpcomingFeature("StrictConcurrency"),
                 ],

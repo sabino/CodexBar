@@ -857,6 +857,8 @@ enum CostUsageScanner {
         let modelsDevCatalog: ModelsDevCatalog?
         let modelsDevCacheRoot: URL?
         let priorityTurns: [String: CodexPriorityTurnMetadata]
+        let duplicateSessionIDs: Set<String>
+        let hydrateCachedUsage: (String, CostUsageFileUsage) -> CostUsageFileUsage?
     }
 
     final class CodexCachePathAliasIndex {
@@ -1533,6 +1535,7 @@ enum CostUsageScanner {
         private let fileIndex: CodexSessionFileIndex
         private let checkCancellation: CancellationCheck?
         private let scanBudget: CodexScanBudget?
+        private let hydrateCachedUsage: (String, CostUsageFileUsage) -> CostUsageFileUsage?
         private var cachedFiles: [String: CostUsageFileUsage]
         private var snapshotResolutions: [String: SnapshotResolution] = [:]
         private var resolvedDependencyKeys: [String: String] = [:]
@@ -1542,12 +1545,14 @@ enum CostUsageScanner {
             fileIndex: CodexSessionFileIndex,
             checkCancellation: CancellationCheck?,
             scanBudget: CodexScanBudget? = nil,
-            cachedFiles: [String: CostUsageFileUsage] = [:])
+            cachedFiles: [String: CostUsageFileUsage] = [:],
+            hydrateCachedUsage: @escaping (String, CostUsageFileUsage) -> CostUsageFileUsage? = { _, usage in usage })
         {
             self.fileIndex = fileIndex
             self.checkCancellation = checkCancellation
             self.scanBudget = scanBudget
             self.cachedFiles = cachedFiles
+            self.hydrateCachedUsage = hydrateCachedUsage
         }
 
         func updateCachedUsage(fileURL: URL, usage: CostUsageFileUsage?) {
@@ -1814,9 +1819,16 @@ enum CostUsageScanner {
             metadata: CodexFileMetadata) -> SnapshotResolution?
         {
             let standardizedPath = fileURL.standardizedFileURL.path
-            let cachedUsage = self.cachedFiles[fileURL.path] ?? self.cachedFiles[standardizedPath]
-            guard let usage = cachedUsage,
-                  usage.sessionId == sessionId,
+            guard var usage = self.cachedFiles[fileURL.path] ?? self.cachedFiles[standardizedPath],
+                  usage.sessionId == sessionId
+            else { return nil }
+            if usage.codexLazyStorageState?.tokenSnapshotsHydrated == false {
+                guard let hydrated = self.hydrateCachedUsage(standardizedPath, usage) else { return nil }
+                usage = hydrated
+                self.cachedFiles[fileURL.path] = hydrated
+                self.cachedFiles[standardizedPath] = hydrated
+            }
+            guard usage.sessionId == sessionId,
                   usage.codexScanFileId == nil || usage.codexScanFileId == metadata.fileId,
                   let cachedSnapshots = usage.codexTokenSnapshots
             else { return nil }
@@ -4939,14 +4951,34 @@ enum CostUsageScanner {
             cache: &cache,
             aliasIndex: context.resources.cachePathAliasIndex)
 
-        let cached = cache.files[metadata.path]
-
-        let input = CodexFileScanInput(fileURL: fileURL, metadata: metadata, cached: cached)
+        var input = CodexFileScanInput(
+            fileURL: fileURL,
+            metadata: metadata,
+            cached: cache.files[metadata.path])
         if try Self.keepCachedCodexFileIfFresh(input: input, context: context, cache: &cache, state: &state) {
             return .processed
         }
 
-        let pendingWorkBytes = Self.pendingCodexScanWorkBytes(metadata: metadata, cached: cached)
+        if let compact = input.cached, compact.hasUnhydratedCodexDetails {
+            guard let hydrated = context.resources.hydrateCachedUsage(metadata.path, compact) else {
+                Self.log.warning(
+                    "Deferring Codex session scan because cached raw details could not be hydrated",
+                    metadata: ["path": metadata.path])
+                return .deferred
+            }
+            cache.files[metadata.path] = hydrated
+            input = CodexFileScanInput(fileURL: fileURL, metadata: metadata, cached: hydrated)
+            if try Self.keepCachedCodexFileIfFresh(
+                input: input,
+                context: context,
+                cache: &cache,
+                state: &state)
+            {
+                return .processed
+            }
+        }
+
+        let pendingWorkBytes = Self.pendingCodexScanWorkBytes(metadata: metadata, cached: input.cached)
         let allowedWorkBytes: Int64
         if let budget = context.scanBudget {
             switch budget.admit(workBytes: pendingWorkBytes) {
@@ -5165,7 +5197,7 @@ enum CostUsageScanner {
         options: Options,
         range: CostUsageDayRange) -> CostUsageStoreLoad
     {
-        CostUsageStoreAccess.load(cacheRoot: options.cacheRoot, calendar: range.calendar)
+        CostUsageStoreAccess.loadForScan(cacheRoot: options.cacheRoot, calendar: range.calendar)
     }
 
     private static func codexPreviousReportCandidate(
@@ -5465,11 +5497,20 @@ enum CostUsageScanner {
                 scanBudget: scanBudget,
                 headParseObserver: self.codexSessionHeadParseObserverStore?.observer,
                 checkCancellation: checkCancellation)
+            let hydrateCachedUsage: (String, CostUsageFileUsage) -> CostUsageFileUsage? = { path, usage in
+                CostUsageStoreAccess.hydrate(
+                    store: loadedCache.store,
+                    path: path,
+                    usage: usage)
+            }
+            let duplicateSessionIDs = Set(Dictionary(grouping: cache.files.values.compactMap(\.sessionId)) { $0 }
+                .compactMap { sessionID, occurrences in occurrences.count > 1 ? sessionID : nil })
             let inheritedResolver = CodexInheritedTotalsResolver(
                 fileIndex: fileIndex,
                 checkCancellation: checkCancellation,
                 scanBudget: scanBudget,
-                cachedFiles: cache.files)
+                cachedFiles: cache.files,
+                hydrateCachedUsage: hydrateCachedUsage)
             let cachePathAliasIndex = CodexCachePathAliasIndex(
                 files: cache.files,
                 workRecorder: options.codexScanWorkRecorderForTesting)
@@ -5480,7 +5521,9 @@ enum CostUsageScanner {
                 projectPathResolver: CodexCanonicalProjectPathResolver(),
                 modelsDevCatalog: plan.modelsDevCatalog,
                 modelsDevCacheRoot: options.cacheRoot,
-                priorityTurns: plan.priorityTurns)
+                priorityTurns: plan.priorityTurns,
+                duplicateSessionIDs: duplicateSessionIDs,
+                hydrateCachedUsage: hydrateCachedUsage)
             let scanContext = Self.codexFileScanContext(
                 range: range,
                 options: options,
