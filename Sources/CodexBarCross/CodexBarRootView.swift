@@ -24,7 +24,7 @@ struct CodexBarRootView: View {
             Divider()
             ModelObservedRegion(model: self.model) {
                 ScrollView {
-                    NavigationObservedRegion(navigation: self.model.navigationModel) {
+                    PublishedObservedRegion(observation: self.model.navigationModel.routeObservation) {
                         PersistentViewSwitcher(
                             selection: self.contentCacheKey,
                             revision: self.model.selectedContentRevision)
@@ -80,18 +80,27 @@ struct CodexBarRootView: View {
             }
             .frame(maxWidth: .infinity)
 
-            NavigationObservedRegion(navigation: self.model.navigationModel) {
+            PublishedObservedRegion(observation: self.model.navigationModel.searchObservation) {
                 TextField("Search providers", text: Binding(
                     get: { self.model.searchQuery },
                     set: { self.model.setSearchQuery($0) }))
             }
 
-            NavigationObservedRegion(navigation: self.model.navigationModel) {
+            #if os(Linux)
+            PublishedObservedRegion(observation: self.model.navigationModel.providerObservation) {
                 PlatformNavigationList(
                     items: self.navigationItems,
                     selection: self.navigationSelection)
                     .frame(maxWidth: .infinity)
             }
+            #else
+            PublishedObservedRegion(observation: self.model.navigationModel.sectionObservation) {
+                PlatformNavigationList(
+                    items: self.navigationItems,
+                    selection: self.navigationSelection)
+                    .frame(maxWidth: .infinity)
+            }
+            #endif
 
             Divider()
             Text("PROVIDERS")
@@ -99,20 +108,22 @@ struct CodexBarRootView: View {
                 .foregroundColor(CodexBarPalette.secondaryText)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            NavigationObservedRegion(navigation: self.model.navigationModel) {
-                if self.model.filteredProviders.isEmpty {
-                    Text("No matching providers")
-                        .font(.caption)
-                        .foregroundColor(CodexBarPalette.secondaryText)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                    Spacer()
-                } else {
-                    PlatformProviderList(
-                        items: self.providerListItems,
-                        selection: self.providerSelection)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+            SearchObservedRegion(navigation: self.model.navigationModel) {
+                PublishedObservedRegion(observation: self.model.navigationModel.providerObservation) {
+                    if self.model.filteredProviders.isEmpty {
+                        Text("No matching providers")
+                            .font(.caption)
+                            .foregroundColor(CodexBarPalette.secondaryText)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                        Spacer()
+                    } else {
+                        PlatformProviderList(
+                            items: { self.providerListItems },
+                            selection: self.providerSelection)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 }
             }
         }
@@ -711,7 +722,9 @@ struct CodexBarRootView: View {
             }
         }
     }
+}
 
+extension CodexBarRootView {
     private func providerDetail(_ provider: CodexBarCrossModel.ProviderRow) -> some View {
         let descriptor = ProviderDescriptorRegistry.descriptor(for: provider.id)
         let authentication = self.model.authenticationSummary(for: provider.id)
@@ -857,9 +870,7 @@ struct CodexBarRootView: View {
             }
         }
     }
-}
 
-extension CodexBarRootView {
     private func paneHeader(title: String, subtitle: String) -> some View {
         VStack(spacing: 6) {
             Text(title)
@@ -1097,12 +1108,36 @@ private struct ModelObservedRegion<Content: View>: View {
     }
 
     var body: some View {
-        let _ = self.model
+        self.content(observing: self.model)
+    }
+
+    private func content(observing _: CodexBarCrossModel) -> Content {
         self.content()
     }
 }
 
-private struct NavigationObservedRegion<Content: View>: View {
+private struct PublishedObservedRegion<Value, Content: View>: View {
+    @State private var observation: SwiftCrossUI.Published<Value>
+    private let content: () -> Content
+
+    init(
+        observation: SwiftCrossUI.Published<Value>,
+        @ViewBuilder content: @escaping () -> Content)
+    {
+        self._observation = State(wrappedValue: observation)
+        self.content = content
+    }
+
+    var body: some View {
+        self.content(observing: self.observation.wrappedValue)
+    }
+
+    private func content(observing _: Value) -> Content {
+        self.content()
+    }
+}
+
+private struct SearchObservedRegion<Content: View>: View {
     @State private var navigation: CodexBarCrossNavigationModel
     private let content: () -> Content
 
@@ -1115,7 +1150,10 @@ private struct NavigationObservedRegion<Content: View>: View {
     }
 
     var body: some View {
-        let _ = self.navigation
+        self.content(observing: self.navigation.searchQuery)
+    }
+
+    private func content(observing _: String) -> Content {
         self.content()
     }
 }

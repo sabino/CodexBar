@@ -4,6 +4,23 @@ import Testing
 
 struct CodexBarCrossNavigationStateTests {
     @Test
+    func `cached history opens without immediate maintenance`() {
+        #expect(!CodexBarCrossHistoryLoadingPolicy.shouldRunImmediateMaintenance(
+            cachedSnapshotLoaded: true,
+            refreshOnOpen: true))
+    }
+
+    @Test
+    func `first history load can start immediate maintenance`() {
+        #expect(CodexBarCrossHistoryLoadingPolicy.shouldRunImmediateMaintenance(
+            cachedSnapshotLoaded: false,
+            refreshOnOpen: true))
+        #expect(!CodexBarCrossHistoryLoadingPolicy.shouldRunImmediateMaintenance(
+            cachedSnapshotLoaded: false,
+            refreshOnOpen: false))
+    }
+
+    @Test
     func `selecting the active section is a no-op`() {
         var state = CodexBarCrossNavigationState()
 

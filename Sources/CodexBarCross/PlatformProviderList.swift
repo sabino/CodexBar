@@ -37,7 +37,7 @@ struct PlatformProviderList: GtkWidgetRepresentable {
         var appliedSelection: UsageProvider?
     }
 
-    let items: [PlatformProviderListItem]
+    let items: () -> [PlatformProviderListItem]
     let selection: Binding<UsageProvider?>
 
     func makeCoordinator() -> Coordinator {
@@ -75,8 +75,9 @@ struct PlatformProviderList: GtkWidgetRepresentable {
             self.selection.wrappedValue = provider
         }
 
-        if coordinator.items != self.items {
-            Self.rebuildRows(coordinator: coordinator, items: self.items)
+        let items = self.items()
+        if coordinator.items != items {
+            Self.rebuildRows(coordinator: coordinator, items: items)
         }
         Self.synchronizeSelection(
             coordinator: coordinator,
@@ -187,12 +188,12 @@ struct PlatformProviderList: GtkWidgetRepresentable {
 
 /// AppKit and WinUI use SwiftCrossUI's native selectable-list backend through the same API.
 struct PlatformProviderList: View {
-    let items: [PlatformProviderListItem]
+    let items: () -> [PlatformProviderListItem]
     let selection: Binding<UsageProvider?>
 
     var body: some View {
         ScrollView {
-            List(self.items, selection: self.selection) { item in
+            List(self.items(), selection: self.selection) { item in
                 HStack(spacing: 8) {
                     Text(item.symbol)
                     Text(item.title)

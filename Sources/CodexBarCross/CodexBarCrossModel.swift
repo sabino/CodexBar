@@ -225,8 +225,11 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
         _ = self.navigationModel.select(section)
         if section == .spend, self.costSnapshot == nil, !self.isRefreshingSpend {
             Task {
-                await self.loadCachedSpendHistory()
-                if self.preferences.refreshOnOpen {
+                let cachedSnapshotLoaded = await self.loadCachedSpendHistory()
+                if CodexBarCrossHistoryLoadingPolicy.shouldRunImmediateMaintenance(
+                    cachedSnapshotLoaded: cachedSnapshotLoaded,
+                    refreshOnOpen: self.preferences.refreshOnOpen)
+                {
                     await self.performAutomaticHistoryMaintenanceSlice()
                 }
             }
@@ -333,19 +336,20 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
     /// Starts the low-duty history loop without doing work at application startup.
     ///
     /// The first pass happens only after the configured refresh interval. Opening
-    /// Usage & Spend can request one immediate bounded pass after its compact cache
-    /// has already rendered. Explicit Refresh uses the separate draining coordinator.
+    /// Usage & Spend requests one immediate bounded pass only when no compact cache
+    /// exists yet. Explicit Refresh uses the separate draining coordinator.
     func startAutomaticHistoryMaintenance() {
         guard !self.automaticHistoryMaintenanceStarted else { return }
         self.automaticHistoryMaintenanceStarted = true
         self.rescheduleAutomaticHistoryMaintenance()
     }
 
-    func loadCachedSpendHistory() async {
-        guard !self.isRefreshingSpend else { return }
+    @discardableResult
+    func loadCachedSpendHistory() async -> Bool {
+        guard !self.isRefreshingSpend else { return false }
         guard self.preferences.historyEnabled else {
             self.setSpendError("Local usage history is disabled in Advanced.")
-            return
+            return false
         }
         var loadingPresentation = self.spendPresentation
         loadingPresentation.isRefreshing = true
@@ -364,6 +368,7 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
         }
         presentation.isRefreshing = false
         self.publishSpendPresentation(presentation)
+        return snapshot != nil
     }
 
     func refreshSpendHistory() async {

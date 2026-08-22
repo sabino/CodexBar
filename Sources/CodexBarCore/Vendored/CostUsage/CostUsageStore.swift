@@ -106,6 +106,7 @@ actor CostUsageStore {
     nonisolated let databaseURL: URL
     private let expectedSchemaVersion: Int32
     private let expectedParserHash: String
+    private let validatesIntegrityOnOpen: Bool
     private var connection: SQLiteConnection?
     private(set) var rebuildCount = 0
     /// While a save cycle's enclosing transaction is open, nested `withDatabase` calls join
@@ -117,7 +118,8 @@ actor CostUsageStore {
     init(
         cacheRoot: URL? = nil,
         schemaVersion: Int32 = CostUsageStore.schemaVersion,
-        parserHash: String = CodexParserHash.value)
+        parserHash: String = CodexParserHash.value,
+        validatesIntegrityOnOpen: Bool = true)
     {
         let root = cacheRoot ?? FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
             .appendingPathComponent("CodexBar", isDirectory: true)
@@ -126,6 +128,7 @@ actor CostUsageStore {
             .appendingPathComponent(Self.databaseFilename, isDirectory: false)
         self.expectedSchemaVersion = schemaVersion
         self.expectedParserHash = parserHash
+        self.validatesIntegrityOnOpen = validatesIntegrityOnOpen
     }
 
     static func combinedSchemaVersion(base: Int, parserHash: String) -> Int32 {
@@ -382,7 +385,11 @@ extension CostUsageStore {
             guard state.isCurrent || state.canAdoptPredecessor else {
                 throw StoreError.incompatibleSchema
             }
-            try Self.validateDatabaseIntegrity(database)
+            if self.validatesIntegrityOnOpen || !state.isCurrent {
+                try Self.validateDatabaseIntegrity(database)
+            } else {
+                try Self.validateDatabaseConfiguration(database)
+            }
             try Self.execute(database, "COMMIT")
         } catch {
             try? Self.execute(database, "ROLLBACK")
@@ -436,6 +443,10 @@ extension CostUsageStore {
         guard try self.scalarText(database, "PRAGMA quick_check") == "ok" else {
             throw StoreError.invalidData
         }
+        try self.validateDatabaseConfiguration(database)
+    }
+
+    private static func validateDatabaseConfiguration(_ database: OpaquePointer) throws {
         guard try self.scalarInt(database, "PRAGMA auto_vacuum") == 2 else {
             throw StoreError.incompatibleSchema
         }

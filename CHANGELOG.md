@@ -4,6 +4,8 @@
 
 - Cross-platform Swift UI: isolate and deduplicate navigation state, retain visited panes, coalesce GTK resize layout,
   batch refresh publications, and avoid repeatedly measuring native sidebar rows.
+- Cross-platform Swift UI: keep native provider search synchronized and open cached Usage & Spend history without an
+  immediate archive walk or repeated full-database integrity scan; explicit Refresh still performs a full catch-up.
 - Command Code: recognize the repriced Pro tier (`individual-pro-v1`, $80/mo in credits) instead of failing with an unknown-plan error (#3116). Thanks @sebastianmarines!
 - Alibaba: retry the Personal usage gateway's transient empty-Success responses instead of surfacing a parse error (#3128). Thanks @LeoLin990405!
 

@@ -1545,7 +1545,10 @@ enum CostUsageStoreAccess {
         sinceDay: String,
         untilDay: String) -> CostUsageCache
     {
-        let store = CostUsageStore(cacheRoot: cacheRoot)
+        // The dashboard reads bounded aggregate rows and fails soft on SQLite errors. Avoid a
+        // full-file quick_check here: on large history stores it is orders of magnitude more
+        // expensive than the report query itself. Scanner/writer opens retain full validation.
+        let store = CostUsageStore(cacheRoot: cacheRoot, validatesIntegrityOnOpen: false)
         let report = store.syncReadReport(sinceDay: sinceDay, untilDay: untilDay)
         return CostUsageStore.aggregateReportCache(from: report, calendar: calendar)
     }

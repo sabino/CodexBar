@@ -84,25 +84,38 @@ struct PlatformNavigationList: GtkWidgetRepresentable {
             row.marginBottom = 2
             row.marginStart = 0
             row.marginEnd = 0
+            row.css.set(properties: [
+                CSSProperty(key: "background", value: "transparent"),
+                CSSProperty(key: "border-radius", value: "8px"),
+                CSSProperty(key: "padding", value: "7px 6px"),
+            ], clear: true)
 
             let symbol = Gtk.Label(string: item.symbol)
             symbol.widthChars = 2
             symbol.xalign = 0.5
-            symbol.css.set(properties: [.fontSize(12)], clear: true)
+            symbol.css.set(properties: [
+                CSSProperty(key: "color", value: "rgba(226, 228, 235, 0.92)"),
+                .fontSize(12),
+            ], clear: true)
 
             let title = Gtk.Label(string: item.title)
             title.expandHorizontally = true
             title.horizontalAlignment = .fill
             title.xalign = 0
             title.singleLineMode = true
-            title.css.set(properties: [.fontSize(13)], clear: true)
+            title.css.set(properties: [
+                CSSProperty(key: "color", value: "rgba(226, 228, 235, 0.92)"),
+                .fontSize(13),
+            ], clear: true)
 
             row.add(symbol)
             row.add(title)
 
             let click = Gtk.GestureClick()
             click.released = { [weak coordinator] _, _, _, _ in
-                coordinator?.select?(item.id)
+                guard let coordinator else { return }
+                Self.synchronizeSelection(coordinator: coordinator, selection: item.id)
+                coordinator.select?(item.id)
             }
             row.addEventController(click)
             coordinator.list.append(row)
@@ -119,10 +132,13 @@ struct PlatformNavigationList: GtkWidgetRepresentable {
         coordinator: Coordinator,
         selection: CodexBarCrossSection?)
     {
-        guard coordinator.appliedSelection != selection else { return }
+        let previousSelection = coordinator.appliedSelection
+        guard previousSelection != selection else { return }
         coordinator.appliedSelection = selection
 
-        for row in coordinator.rows {
+        for row in coordinator.rows
+            where row.id == previousSelection || row.id == selection
+        {
             let isSelected = row.id == selection
             row.container.css.set(properties: [
                 CSSProperty(

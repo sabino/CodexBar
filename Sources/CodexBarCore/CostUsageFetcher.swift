@@ -968,13 +968,16 @@ public struct CostUsageFetcher: Sendable {
             // would let stale token rows inherit app-start freshness (#1964). lastRefreshAt
             // drives TTL suppression and stays native-only: a merged load must never delay a
             // rescan on the strength of another source's scan.
+            let mergedReport = reports.count == 1
+                ? reports[0]
+                : CostUsageDailyReport.merged(reports)
             return CachedCodexTokenSnapshotResult(
                 snapshot: Self.tokenSnapshot(
-                    from: CostUsageDailyReport.merged(reports),
+                    from: mergedReport,
                     now: now,
                     historyDays: clampedHistoryDays,
                     calendar: options.calendar,
-                    historyCoverageIsEstablished: Self.codexHistoryCoverageIsEstablished(options: options),
+                    historyCoverageIsEstablished: nativeHistoryCoverageIsEstablished,
                     costProvenance: .listPriceEstimate,
                     projects: Self.mergedProjectBreakdowns(projects),
                     sessions: sessions,
