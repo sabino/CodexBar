@@ -13,8 +13,6 @@ import WinUIBackend
 
 @main
 struct CodexBarCrossApp: App {
-    @State private var model = CodexBarCrossModel()
-
     init() {
         #if os(Linux)
         // This UI is almost entirely text and simple vector shapes. GTK's Cairo
@@ -28,7 +26,7 @@ struct CodexBarCrossApp: App {
 
     var body: some Scene {
         WindowGroup("CodexBar") {
-            CodexBarRootView(model: self.model)
+            CodexBarRootView()
         }
         .defaultSize(width: 980, height: 680)
         .windowResizability(.contentMinSize)

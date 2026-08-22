@@ -1,18 +1,11 @@
 import CodexBarCore
+import CodexBarCrossSupport
 import Foundation
 import SwiftCrossUI
 
 @MainActor
 final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
-    enum Section: String, CaseIterable {
-        case general = "General"
-        case spend = "Usage & Spend"
-        case notifications = "Notifications"
-        case menuBar = "Menu Bar"
-        case menu = "Menu"
-        case advanced = "Advanced"
-        case about = "About"
-    }
+    typealias Section = CodexBarCrossSection
 
     enum SpendRange: Int, CaseIterable, Identifiable {
         case week = 7
@@ -59,20 +52,31 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
         }
     }
 
-    @SwiftCrossUI.Published var section: Section = .general
-    @SwiftCrossUI.Published var selectedProviderID: UsageProvider?
-    @SwiftCrossUI.Published var searchQuery = ""
-    @SwiftCrossUI.Published var providers: [ProviderRow]
-    @SwiftCrossUI.Published var isRefreshing = false
-    @SwiftCrossUI.Published var lastUpdated: Date?
-    @SwiftCrossUI.Published var globalError: String?
-    @SwiftCrossUI.Published var spendRange: SpendRange = .month
-    @SwiftCrossUI.Published var costSnapshot: CostUsageTokenSnapshot?
-    @SwiftCrossUI.Published var spendDashboard = SpendDashboardModel(requestedDays: 30, groups: [])
-    @SwiftCrossUI.Published var isRefreshingSpend = false
-    @SwiftCrossUI.Published var spendError: String?
-    @SwiftCrossUI.Published var historyProgressText: String?
-    @SwiftCrossUI.Published var historyProgressFraction: Double?
+    struct ContentRevision: Hashable {
+        let preferences: UInt64
+        let provider: UInt64
+        let spend: UInt64
+    }
+
+    private struct ProviderPresentation {
+        var providers: [ProviderRow]
+        var isRefreshing = false
+        var lastUpdated: Date?
+        var globalError: String?
+    }
+
+    private struct SpendPresentation {
+        var range: SpendRange = .month
+        var snapshot: CostUsageTokenSnapshot?
+        var dashboard = SpendDashboardModel(requestedDays: SpendRange.month.rawValue, groups: [])
+        var isRefreshing = false
+        var error: String?
+        var historyProgressText: String?
+        var historyProgressFraction: Double?
+    }
+
+    @SwiftCrossUI.Published private var providerPresentation: ProviderPresentation
+    @SwiftCrossUI.Published private var spendPresentation = SpendPresentation()
     @SwiftCrossUI.Published var preferences: CodexBarCrossPreferences
 
     private var config: CodexBarConfig
@@ -82,6 +86,10 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
     private let preferencesStore: CodexBarCrossPreferencesStore
     private var automaticHistoryMaintenanceTask: Task<Void, Never>?
     private var automaticHistoryMaintenanceStarted = false
+    private var preferencesRevision: UInt64 = 0
+    private var providerRevision: UInt64 = 0
+    private var spendRevision: UInt64 = 0
+    let navigationModel = CodexBarCrossNavigationModel()
 
     init(configStore: CodexBarConfigStore = CodexBarConfigStore()) {
         let preferencesStore = CodexBarCrossPreferencesStore()
@@ -91,7 +99,7 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
         self.config = (try? configStore.load()) ?? CodexBarConfig.makeDefault()
         self.providerRuntime = ProviderRuntimeSession(configStore: configStore)
         let enabled = Set(self.config.enabledProviders().compactMap(\.firstPartyProvider))
-        self.providers = ProviderDescriptorRegistry.all.map { descriptor in
+        let providers = ProviderDescriptorRegistry.all.map { descriptor in
             ProviderRow(
                 id: descriptor.id,
                 name: descriptor.metadata.displayName,
@@ -99,10 +107,63 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
                 accent: descriptor.branding.color,
                 enabled: enabled.contains(descriptor.id))
         }
-        // The standalone window is the settings surface. The tray popup owns the
-        // selected-provider-at-open behavior, so opening Settings must not trigger
-        // a real provider probe or land on an unrelated provider pane.
-        self.selectedProviderID = nil
+        self.providerPresentation = ProviderPresentation(providers: providers)
+    }
+
+    var section: Section {
+        self.navigationModel.state.section ?? .general
+    }
+
+    var selectedProviderID: UsageProvider? {
+        self.navigationModel.state.provider
+    }
+
+    var searchQuery: String {
+        self.navigationModel.searchQuery
+    }
+
+    var providers: [ProviderRow] {
+        self.providerPresentation.providers
+    }
+
+    var isRefreshing: Bool {
+        self.providerPresentation.isRefreshing
+    }
+
+    var lastUpdated: Date? {
+        self.providerPresentation.lastUpdated
+    }
+
+    var globalError: String? {
+        self.providerPresentation.globalError
+    }
+
+    var spendRange: SpendRange {
+        self.spendPresentation.range
+    }
+
+    var costSnapshot: CostUsageTokenSnapshot? {
+        self.spendPresentation.snapshot
+    }
+
+    var spendDashboard: SpendDashboardModel {
+        self.spendPresentation.dashboard
+    }
+
+    var isRefreshingSpend: Bool {
+        self.spendPresentation.isRefreshing
+    }
+
+    var spendError: String? {
+        self.spendPresentation.error
+    }
+
+    var historyProgressText: String? {
+        self.spendPresentation.historyProgressText
+    }
+
+    var historyProgressFraction: Double? {
+        self.spendPresentation.historyProgressFraction
     }
 
     var filteredProviders: [ProviderRow] {
@@ -117,6 +178,25 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
     var selectedProvider: ProviderRow? {
         guard let selectedProviderID else { return nil }
         return self.providers.first(where: { $0.id == selectedProviderID })
+    }
+
+    var selectedContentRevision: ContentRevision {
+        if self.selectedProviderID != nil {
+            return ContentRevision(
+                preferences: self.preferencesRevision,
+                provider: self.providerRevision,
+                spend: 0)
+        }
+        if self.section == .spend {
+            return ContentRevision(
+                preferences: self.preferencesRevision,
+                provider: 0,
+                spend: self.spendRevision)
+        }
+        return ContentRevision(
+            preferences: self.preferencesRevision,
+            provider: 0,
+            spend: 0)
     }
 
     func authenticationSummary(for provider: UsageProvider) -> ProviderDiagnosticAuthSummary {
@@ -142,8 +222,7 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
     }
 
     func select(_ section: Section) {
-        self.selectedProviderID = nil
-        self.section = section
+        _ = self.navigationModel.select(section)
         if section == .spend, self.costSnapshot == nil, !self.isRefreshingSpend {
             Task {
                 await self.loadCachedSpendHistory()
@@ -154,14 +233,21 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
         }
     }
 
-    func select(_ provider: UsageProvider) {
-        self.selectedProviderID = provider
+    @discardableResult
+    func select(_ provider: UsageProvider) -> Bool {
+        self.navigationModel.select(provider)
     }
 
     func selectSpendRange(_ range: SpendRange) {
         guard self.spendRange != range else { return }
-        self.spendRange = range
-        self.rebuildSpendDashboard()
+        var presentation = self.spendPresentation
+        presentation.range = range
+        presentation.dashboard = Self.makeSpendDashboard(snapshot: presentation.snapshot, range: range)
+        self.publishSpendPresentation(presentation)
+    }
+
+    func setSearchQuery(_ query: String) {
+        self.navigationModel.setSearchQuery(query)
     }
 
     func refreshSelectedProvider() async {
@@ -174,12 +260,11 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
         interaction: ProviderInteraction = .userInitiated) async
     {
         guard !self.isRefreshing else { return }
-        self.isRefreshing = true
-        self.globalError = nil
-        defer {
-            self.isRefreshing = false
-            PlatformMemory.releaseUnusedHeapPages()
-        }
+        var loadingPresentation = self.providerPresentation
+        loadingPresentation.isRefreshing = true
+        loadingPresentation.globalError = nil
+        self.publishProviderPresentation(loadingPresentation)
+        defer { PlatformMemory.releaseUnusedHeapPages() }
 
         do {
             let result = try await self.providerRuntime.fetch(
@@ -187,31 +272,59 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
                 config: self.config,
                 historyDays: 365,
                 interaction: interaction)
-            self.update(provider: provider, result: result, error: nil)
-            self.lastUpdated = Date()
+            var presentation = self.providerPresentation
+            Self.updateProvider(
+                provider,
+                in: &presentation.providers,
+                result: result,
+                error: nil)
+            presentation.lastUpdated = Date()
+            presentation.isRefreshing = false
+            self.publishProviderPresentation(presentation)
         } catch {
-            self.update(provider: provider, result: nil, error: error.localizedDescription)
-            self.globalError = error.localizedDescription
+            var presentation = self.providerPresentation
+            Self.updateProvider(
+                provider,
+                in: &presentation.providers,
+                result: nil,
+                error: error.localizedDescription)
+            presentation.globalError = error.localizedDescription
+            presentation.isRefreshing = false
+            self.publishProviderPresentation(presentation)
         }
     }
 
     func setEnabled(_ provider: UsageProvider, enabled: Bool) {
         guard var providerConfig = self.config.providerConfig(for: provider.instanceID) else { return }
+        guard providerConfig.enabled != enabled else { return }
         providerConfig.enabled = enabled
         self.config.setProviderConfig(providerConfig)
         do {
             try self.configStore.save(self.config)
-            if let index = self.providers.firstIndex(where: { $0.id == provider }) {
-                self.providers[index].enabled = enabled
+            var presentation = self.providerPresentation
+            if let index = presentation.providers.firstIndex(where: { $0.id == provider }),
+               presentation.providers[index].enabled != enabled
+            {
+                presentation.providers[index].enabled = enabled
+                self.publishProviderPresentation(presentation)
             }
         } catch {
-            self.globalError = error.localizedDescription
+            var presentation = self.providerPresentation
+            if presentation.globalError != error.localizedDescription {
+                presentation.globalError = error.localizedDescription
+                self.publishProviderPresentation(presentation)
+            }
         }
     }
 
-    func setPreference<Value>(_ keyPath: WritableKeyPath<CodexBarCrossPreferences, Value>, to value: Value) {
+    func setPreference<Value: Equatable>(
+        _ keyPath: WritableKeyPath<CodexBarCrossPreferences, Value>,
+        to value: Value)
+    {
         var preferences = self.preferences
+        guard preferences[keyPath: keyPath] != value else { return }
         preferences[keyPath: keyPath] = value
+        self.preferencesRevision &+= 1
         self.preferences = preferences
         self.preferencesStore.save(preferences)
         self.rescheduleAutomaticHistoryMaintenance()
@@ -231,39 +344,41 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
     func loadCachedSpendHistory() async {
         guard !self.isRefreshingSpend else { return }
         guard self.preferences.historyEnabled else {
-            self.spendError = "Local usage history is disabled in Advanced."
+            self.setSpendError("Local usage history is disabled in Advanced.")
             return
         }
-        self.isRefreshingSpend = true
-        self.spendError = nil
-        defer {
-            self.isRefreshingSpend = false
-            PlatformMemory.releaseUnusedHeapPages()
-        }
-        if let snapshot = await self.costFetcher.loadCachedCodexTokenSnapshot(
+        var loadingPresentation = self.spendPresentation
+        loadingPresentation.isRefreshing = true
+        loadingPresentation.error = nil
+        self.publishSpendPresentation(loadingPresentation)
+        defer { PlatformMemory.releaseUnusedHeapPages() }
+
+        let snapshot = await self.costFetcher.loadCachedCodexTokenSnapshot(
             historyDays: SpendRange.year.rawValue,
             includeProjectAndSessionBreakdowns: false)
-        {
-            self.publishSpendSnapshot(snapshot)
+        var presentation = self.spendPresentation
+        if let snapshot {
+            Self.applySpendSnapshot(snapshot, to: &presentation)
         } else {
-            self.spendError = "No indexed spend history is available yet."
+            presentation.error = "No indexed spend history is available yet."
         }
+        presentation.isRefreshing = false
+        self.publishSpendPresentation(presentation)
     }
 
     func refreshSpendHistory() async {
         guard !self.isRefreshingSpend else { return }
         guard self.preferences.historyEnabled else {
-            self.spendError = "Local usage history is disabled in Advanced."
+            self.setSpendError("Local usage history is disabled in Advanced.")
             return
         }
-        self.isRefreshingSpend = true
-        self.spendError = nil
-        self.historyProgressFraction = nil
-        defer {
-            self.isRefreshingSpend = false
-            self.historyProgressFraction = nil
-            PlatformMemory.releaseUnusedHeapPages()
-        }
+        var loadingPresentation = self.spendPresentation
+        loadingPresentation.isRefreshing = true
+        loadingPresentation.error = nil
+        loadingPresentation.historyProgressFraction = nil
+        self.publishSpendPresentation(loadingPresentation)
+        defer { PlatformMemory.releaseUnusedHeapPages() }
+
         do {
             // Never blank already indexed history while an explicit full catch-up runs. The
             // aggregate-only cache read is cheap even for very large raw-session corpora.
@@ -273,31 +388,44 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
             {
                 self.publishSpendSnapshot(cached)
             }
-            self.historyProgressText = "Starting full historical refresh…"
+            self.setHistoryProgress(
+                text: "Starting full historical refresh…",
+                fraction: nil)
             let stableSnapshot = try await self.costFetcher.refreshCodexHistoryToCompletion(
                 historyDays: SpendRange.year.rawValue,
                 refreshPricingInBackground: false)
             { [weak self] status in
                 await self?.publishHistoryProgress(status)
             }
-            self.publishSpendSnapshot(stableSnapshot)
-            self.historyProgressText = "Historical usage is fully up to date."
+            var presentation = self.spendPresentation
+            Self.applySpendSnapshot(stableSnapshot, to: &presentation)
+            presentation.historyProgressText = "Historical usage is fully up to date."
+            presentation.historyProgressFraction = nil
+            presentation.isRefreshing = false
+            self.publishSpendPresentation(presentation)
         } catch {
-            self.spendError = error.localizedDescription
-            if self.costSnapshot == nil {
+            var presentation = self.spendPresentation
+            presentation.error = error.localizedDescription
+            if presentation.snapshot == nil {
                 if let cached = await self.costFetcher.loadCachedCodexTokenSnapshot(
                     historyDays: SpendRange.year.rawValue,
                     includeProjectAndSessionBreakdowns: false)
                 {
-                    self.publishSpendSnapshot(cached)
+                    presentation = self.spendPresentation
+                    presentation.error = error.localizedDescription
+                    Self.applySpendSnapshot(cached, to: &presentation)
                 }
             }
+            presentation.historyProgressFraction = nil
+            presentation.isRefreshing = false
+            self.publishSpendPresentation(presentation)
         }
     }
 
     private func publishSpendSnapshot(_ snapshot: CostUsageTokenSnapshot) {
-        self.costSnapshot = snapshot
-        self.rebuildSpendDashboard()
+        var presentation = self.spendPresentation
+        Self.applySpendSnapshot(snapshot, to: &presentation)
+        self.publishSpendPresentation(presentation)
     }
 
     private func rescheduleAutomaticHistoryMaintenance() {
@@ -360,41 +488,84 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
         }
     }
 
-    private func rebuildSpendDashboard() {
-        guard let snapshot = self.costSnapshot else {
-            self.spendDashboard = SpendDashboardModel(requestedDays: self.spendRange.rawValue, groups: [])
-            return
+    private static func makeSpendDashboard(
+        snapshot: CostUsageTokenSnapshot?,
+        range: SpendRange) -> SpendDashboardModel
+    {
+        guard let snapshot else {
+            return SpendDashboardModel(requestedDays: range.rawValue, groups: [])
         }
         let input = SpendDashboardModel.ProviderInput(
             provider: .codex,
             displayName: ProviderDescriptorRegistry.descriptor(for: .codex).metadata.displayName,
             snapshot: snapshot,
             includesIndexedPartialHistory: !snapshot.historyCoverageIsEstablished)
-        self.spendDashboard = SpendDashboardModel.build(
+        return SpendDashboardModel.build(
             inputs: [input],
-            requestedDays: self.spendRange.rawValue,
+            requestedDays: range.rawValue,
             now: Date())
     }
 
     private func publishHistoryProgress(_ status: CostUsageFetcher.CodexScanCatchUpStatus) {
+        let text: String
+        let fraction: Double?
         if status.totalBytes > 0 {
             let processed = min(status.processedBytes, status.totalBytes)
-            self.historyProgressFraction = Double(processed) / Double(status.totalBytes)
-            self.historyProgressText = "Indexed \(status.completedFiles) of \(status.totalFiles) sessions"
+            fraction = Double(processed) / Double(status.totalBytes)
+            text = "Indexed \(status.completedFiles) of \(status.totalFiles) sessions"
         } else if status.totalFiles > 0 {
-            self.historyProgressFraction = Double(status.completedFiles) / Double(status.totalFiles)
-            self.historyProgressText = "Indexed \(status.completedFiles) of \(status.totalFiles) sessions"
+            fraction = Double(status.completedFiles) / Double(status.totalFiles)
+            text = "Indexed \(status.completedFiles) of \(status.totalFiles) sessions"
         } else {
-            self.historyProgressFraction = nil
-            self.historyProgressText = status.pending ? "Indexing historical sessions…" : "Historical usage is current."
+            fraction = nil
+            text = status.pending ? "Indexing historical sessions…" : "Historical usage is current."
         }
+        self.setHistoryProgress(text: text, fraction: fraction)
     }
 
-    private func update(provider: UsageProvider, result: ProviderFetchResult?, error: String?) {
-        guard let index = self.providers.firstIndex(where: { $0.id == provider }) else { return }
-        self.providers[index].snapshot = result?.usage
-        self.providers[index].credits = result?.credits
-        self.providers[index].source = result?.sourceLabel
-        self.providers[index].error = error
+    private func setSpendError(_ error: String?) {
+        guard self.spendPresentation.error != error else { return }
+        var presentation = self.spendPresentation
+        presentation.error = error
+        self.publishSpendPresentation(presentation)
+    }
+
+    private func setHistoryProgress(text: String?, fraction: Double?) {
+        guard self.historyProgressText != text || self.historyProgressFraction != fraction else { return }
+        var presentation = self.spendPresentation
+        presentation.historyProgressText = text
+        presentation.historyProgressFraction = fraction
+        self.publishSpendPresentation(presentation)
+    }
+
+    private func publishProviderPresentation(_ presentation: ProviderPresentation) {
+        self.providerRevision &+= 1
+        self.providerPresentation = presentation
+    }
+
+    private func publishSpendPresentation(_ presentation: SpendPresentation) {
+        self.spendRevision &+= 1
+        self.spendPresentation = presentation
+    }
+
+    private static func applySpendSnapshot(
+        _ snapshot: CostUsageTokenSnapshot,
+        to presentation: inout SpendPresentation)
+    {
+        presentation.snapshot = snapshot
+        presentation.dashboard = self.makeSpendDashboard(snapshot: snapshot, range: presentation.range)
+    }
+
+    private static func updateProvider(
+        _ provider: UsageProvider,
+        in providers: inout [ProviderRow],
+        result: ProviderFetchResult?,
+        error: String?)
+    {
+        guard let index = providers.firstIndex(where: { $0.id == provider }) else { return }
+        providers[index].snapshot = result?.usage
+        providers[index].credits = result?.credits
+        providers[index].source = result?.sourceLabel
+        providers[index].error = error
     }
 }

@@ -121,10 +121,18 @@ let package = Package(
                     .enableUpcomingFeature("StrictConcurrency"),
                 ],
                 linkerSettings: sqlite3LinkerSettings),
+            .target(
+                name: "CodexBarCrossSupport",
+                dependencies: ["CodexBarCore"],
+                path: "Sources/CodexBarCrossSupport",
+                swiftSettings: [
+                    .enableUpcomingFeature("StrictConcurrency"),
+                ]),
             .executableTarget(
                 name: "CodexBarCross",
                 dependencies: [
                     "CodexBarCore",
+                    "CodexBarCrossSupport",
                     .product(name: "SwiftCrossUI", package: "swift-cross-ui"),
                 ] + codexBarCrossBackendDependencies,
                 path: "Sources/CodexBarCross",
@@ -196,6 +204,7 @@ let package = Package(
                 name: "CodexBarLinuxTests",
                 dependencies: [
                     "CodexBarCore",
+                    "CodexBarCrossSupport",
                     "CodexBarCLI",
                     .target(name: "CSQLite3", condition: .when(platforms: [.linux])),
                 ],

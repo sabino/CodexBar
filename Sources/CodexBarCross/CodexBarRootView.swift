@@ -6,20 +6,35 @@ import GtkBackend
 #endif
 
 struct CodexBarRootView: View {
-    var model: CodexBarCrossModel
+    @State private var modelHolder = ModelHolder()
     @Environment(\.dismissWindow) private var dismissWindow
     @Environment(\.openURL) private var openURL
 
+    private var model: CodexBarCrossModel {
+        self.modelHolder.model
+    }
+
     var body: some View {
         HStack(spacing: 0) {
-            self.sidebar
-                .frame(minWidth: 228, idealWidth: 228, maxWidth: 228, maxHeight: .infinity)
-                .background(CodexBarPalette.sidebarBackground)
+            ModelObservedRegion(model: self.model) {
+                self.sidebar
+            }
+            .frame(minWidth: 228, idealWidth: 228, maxWidth: 228, maxHeight: .infinity)
+            .background(CodexBarPalette.sidebarBackground)
             Divider()
-            ScrollView {
-                self.content
+            ModelObservedRegion(model: self.model) {
+                ScrollView {
+                    NavigationObservedRegion(navigation: self.model.navigationModel) {
+                        PersistentViewSwitcher(
+                            selection: self.contentCacheKey,
+                            revision: self.model.selectedContentRevision)
+                        {
+                            self.content
+                        }
+                    }
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                     .padding(28)
+                }
             }
             .frame(minWidth: 620, maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -33,6 +48,7 @@ struct CodexBarRootView: View {
         .toggleStyle(.switch)
         #if os(Linux)
             .inspectWindow { window in
+                LinuxWindowResizeCoalescer.install(on: window)
                 window.setEscapeKeyPressedHandler { [weak window] in
                     window?.close()
                 }
@@ -64,29 +80,17 @@ struct CodexBarRootView: View {
             }
             .frame(maxWidth: .infinity)
 
-            TextField("Search providers", text: self.model.$searchQuery)
+            NavigationObservedRegion(navigation: self.model.navigationModel) {
+                TextField("Search providers", text: Binding(
+                    get: { self.model.searchQuery },
+                    set: { self.model.setSearchQuery($0) }))
+            }
 
-            VStack(spacing: 2) {
-                ForEach(CodexBarCrossModel.Section.allCases, id: \.rawValue) { section in
-                    Button {
-                        self.model.select(section)
-                    } label: {
-                        HStack(spacing: 10) {
-                            self.sidebarGlyph(self.sectionGlyph(section))
-                            Text(section.rawValue)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(self.isSelected(section)
-                            ? CodexBarPalette.selectionBackground
-                            : Color.clear)
-                        .cornerRadius(8)
-                    }
-                    .buttonStyle(.plain)
+            NavigationObservedRegion(navigation: self.model.navigationModel) {
+                PlatformNavigationList(
+                    items: self.navigationItems,
+                    selection: self.navigationSelection)
                     .frame(maxWidth: .infinity)
-                }
             }
 
             Divider()
@@ -95,19 +99,21 @@ struct CodexBarRootView: View {
                 .foregroundColor(CodexBarPalette.secondaryText)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            if self.model.filteredProviders.isEmpty {
-                Text("No matching providers")
-                    .font(.caption)
-                    .foregroundColor(CodexBarPalette.secondaryText)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                Spacer()
-            } else {
-                PlatformProviderList(
-                    items: self.providerListItems,
-                    selection: self.providerSelection)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            NavigationObservedRegion(navigation: self.model.navigationModel) {
+                if self.model.filteredProviders.isEmpty {
+                    Text("No matching providers")
+                        .font(.caption)
+                        .foregroundColor(CodexBarPalette.secondaryText)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                    Spacer()
+                } else {
+                    PlatformProviderList(
+                        items: self.providerListItems,
+                        selection: self.providerSelection)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             }
         }
         .padding(14)
@@ -118,8 +124,9 @@ struct CodexBarRootView: View {
             get: { self.model.selectedProviderID },
             set: { provider in
                 guard let provider else { return }
-                self.model.select(provider)
-                Task { await self.model.refresh(provider) }
+                if self.model.select(provider) {
+                    Task { await self.model.refresh(provider) }
+                }
             })
     }
 
@@ -130,6 +137,35 @@ struct CodexBarRootView: View {
                 title: provider.name,
                 symbol: self.providerGlyph(provider.id),
                 state: self.providerListState(provider))
+        }
+    }
+
+    private var navigationItems: [PlatformNavigationItem] {
+        CodexBarCrossModel.Section.allCases.map { section in
+            PlatformNavigationItem(
+                id: section,
+                title: section.rawValue,
+                symbol: self.sectionGlyph(section))
+        }
+    }
+
+    private var navigationSelection: Binding<CodexBarCrossModel.Section?> {
+        Binding(
+            get: {
+                self.model.selectedProviderID == nil ? self.model.section : nil
+            },
+            set: { section in
+                if let section {
+                    self.model.select(section)
+                }
+            })
+    }
+
+    private var contentCacheKey: ContentCacheKey {
+        if self.model.selectedProviderID != nil {
+            .provider
+        } else {
+            .section(self.model.section)
         }
     }
 
@@ -1041,6 +1077,52 @@ extension CodexBarRootView {
         default: "◇"
         }
     }
+}
+
+@MainActor
+private struct ModelHolder {
+    let model = CodexBarCrossModel()
+}
+
+private struct ModelObservedRegion<Content: View>: View {
+    @State private var model: CodexBarCrossModel
+    private let content: () -> Content
+
+    init(
+        model: CodexBarCrossModel,
+        @ViewBuilder content: @escaping () -> Content)
+    {
+        self._model = State(wrappedValue: model)
+        self.content = content
+    }
+
+    var body: some View {
+        let _ = self.model
+        self.content()
+    }
+}
+
+private struct NavigationObservedRegion<Content: View>: View {
+    @State private var navigation: CodexBarCrossNavigationModel
+    private let content: () -> Content
+
+    init(
+        navigation: CodexBarCrossNavigationModel,
+        @ViewBuilder content: @escaping () -> Content)
+    {
+        self._navigation = State(wrappedValue: navigation)
+        self.content = content
+    }
+
+    var body: some View {
+        let _ = self.navigation
+        self.content()
+    }
+}
+
+private enum ContentCacheKey: Hashable {
+    case section(CodexBarCrossModel.Section)
+    case provider
 }
 
 private enum CodexBarPalette {

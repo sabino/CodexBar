@@ -85,6 +85,19 @@ struct PlatformProviderList: GtkWidgetRepresentable {
         scrollView.sensitive = context.environment.isEnabled
     }
 
+    func sizeThatFits(
+        _ proposal: ProposedViewSize,
+        gtkWidget _: Gtk.ScrolledWindow,
+        context _: Context) -> ViewSize
+    {
+        // The sidebar has a fixed outer width and this list is its flexible remainder.
+        // Asking Gtk for the natural size walks every provider row during each
+        // SwiftCrossUI probe, including every intermediate live-resize event.
+        ViewSize(
+            max(proposal.width ?? 180, 180),
+            max(proposal.height ?? 120, 120))
+    }
+
     private static func rebuildRows(
         coordinator: Coordinator,
         items: [PlatformProviderListItem])
