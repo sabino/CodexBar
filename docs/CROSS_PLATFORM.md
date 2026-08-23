@@ -77,7 +77,9 @@ the complete macOS integration set is required.
 
 Install the x64 Windows App Runtime `1.5.240205001-preview1`, extract the archive, and run
 `CodexBarCross/CodexBarCross.exe`. The release workflow smoke-tests this exact runtime because SwiftCrossUI 0.9.0's
-WinUI backend targets it.
+WinUI backend targets it. Ordinary provider helper commands launch through native `Foundation.Process`; Unix PTY-only
+CLI interactions fail soft when a provider has no API, OAuth, config-file, or non-interactive command fallback on
+Windows.
 
 ## Build from source
 

@@ -9,7 +9,7 @@ enum LocalhostTrustPolicy {
         authenticationMethod: String,
         hasServerTrust: Bool) -> Bool
     {
-        #if !os(Linux)
+        #if os(macOS)
         guard authenticationMethod == NSURLAuthenticationMethodServerTrust else { return false }
         #endif
         let normalizedHost = host.lowercased()
@@ -46,9 +46,7 @@ final class LocalhostSessionDelegate: NSObject {
         disposition: URLSession.AuthChallengeDisposition,
         credential: URLCredential?)
     {
-        #if os(Linux)
-        return (.performDefaultHandling, nil)
-        #else
+        #if os(macOS)
         let protectionSpace = challenge.protectionSpace
         let trust = protectionSpace.serverTrust
         guard LocalhostTrustPolicy.shouldAcceptServerTrust(
@@ -60,6 +58,8 @@ final class LocalhostSessionDelegate: NSObject {
             return (.performDefaultHandling, nil)
         }
         return (.useCredential, URLCredential(trust: trust))
+        #else
+        return (.performDefaultHandling, nil)
         #endif
     }
 }

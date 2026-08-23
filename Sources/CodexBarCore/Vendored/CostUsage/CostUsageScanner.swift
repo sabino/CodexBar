@@ -2466,6 +2466,70 @@ enum CostUsageScanner {
         }
     }
 
+    #if os(Windows)
+    private final class CodexDirectoryCursor: @unchecked Sendable {
+        let entries: [String]
+        var logicalOffset: Int64
+
+        init(entries: [String], logicalOffset: Int64 = 0) {
+            self.entries = entries
+            self.logicalOffset = logicalOffset
+        }
+    }
+
+    private final class CodexDirectoryCursorRegistry: @unchecked Sendable {
+        private let lock = NSLock()
+        private var cursors: [String: CodexDirectoryCursor] = [:]
+
+        func page(
+            directoryURL: URL,
+            resumeOffset: Int64,
+            visitLimit: Int,
+            filter: (String) -> Bool,
+            workRecorder: CodexScanWorkRecorder?) -> CodexDirectoryPage
+        {
+            self.lock.lock()
+            defer { self.lock.unlock() }
+
+            let path = directoryURL.path
+            let resumeOffset = max(0, resumeOffset)
+            if resumeOffset == 0 || (self.cursors[path]?.logicalOffset ?? 0) > resumeOffset {
+                self.cursors.removeValue(forKey: path)
+            }
+            if self.cursors[path] == nil {
+                guard let entries = try? FileManager.default.contentsOfDirectory(atPath: path) else {
+                    return CodexDirectoryPage(files: [], nextOffset: nil, visits: 0)
+                }
+                self.cursors[path] = CodexDirectoryCursor(entries: entries.sorted())
+            }
+            guard let cursor = self.cursors[path] else {
+                return CodexDirectoryPage(files: [], nextOffset: nil, visits: 0)
+            }
+
+            var files: [URL] = []
+            var visits = 0
+            while visits < visitLimit, cursor.logicalOffset < Int64(cursor.entries.count) {
+                let name = cursor.entries[Int(cursor.logicalOffset)]
+                cursor.logicalOffset += 1
+                visits += 1
+                workRecorder?.recordCodexDiscoveryVisit()
+                guard cursor.logicalOffset > resumeOffset, filter(name) else { continue }
+                files.append(directoryURL.appendingPathComponent(name, isDirectory: false))
+            }
+            if cursor.logicalOffset >= Int64(cursor.entries.count) {
+                self.cursors.removeValue(forKey: path)
+                return CodexDirectoryPage(files: files, nextOffset: nil, visits: visits)
+            }
+            return CodexDirectoryPage(files: files, nextOffset: cursor.logicalOffset, visits: visits)
+        }
+
+        func reset() {
+            self.lock.lock()
+            self.cursors.removeAll()
+            self.lock.unlock()
+        }
+    }
+    #else
     #if os(Linux)
     private typealias CodexDirectoryHandle = OpaquePointer
     #else
@@ -2544,6 +2608,7 @@ enum CostUsageScanner {
             self.lock.unlock()
         }
     }
+    #endif
 
     private static let codexDirectoryCursorRegistry = CodexDirectoryCursorRegistry()
 

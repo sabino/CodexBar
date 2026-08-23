@@ -117,10 +117,11 @@ public enum SubprocessRunner {
     @discardableResult
     package static func terminateProcess(_ process: Process, processGroup: pid_t?) -> Bool {
         guard process.isRunning else { return false }
-        let descendants = TTYProcessTreeTerminator.descendantPIDs(of: process.processIdentifier)
+        let processID = pid_t(truncatingIfNeeded: process.processIdentifier)
+        let descendants = TTYProcessTreeTerminator.descendantPIDs(of: processID)
         let descendantIdentities = descendants.compactMap(TTYProcessTreeTerminator.processIdentity(for:))
         TTYProcessTreeTerminator.terminateProcessTree(
-            rootPID: process.processIdentifier,
+            rootPID: processID,
             processGroup: processGroup,
             signal: SIGTERM,
             knownDescendants: descendants)
@@ -233,7 +234,7 @@ public enum SubprocessRunner {
         stdoutCapture.start()
         stderrCapture.start()
 
-        let pid = process.processIdentifier
+        let pid = pid_t(truncatingIfNeeded: process.processIdentifier)
         let processGroup: pid_t? = setpgid(pid, pid) == 0 ? pid : nil
 
         let exitCodeTask = Task<Int32, Never> {

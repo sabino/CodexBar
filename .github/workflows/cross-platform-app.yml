@@ -299,6 +299,16 @@ jobs:
           }
           "bin_dir=$binDirectory" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
 
+      # Preserve the expensive Swift/WinUI dependency build even when CodexBarCore
+      # exposes a later Windows-only compiler error. This keeps portability-fix
+      # iterations from recompiling the complete dependency graph from scratch.
+      - name: Persist Windows SwiftPM build cache
+        if: ${{ always() }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .build
+          key: swiftpm-cross-windows-x86_64-${{ env.SWIFT_VERSION }}-${{ hashFiles('Package.resolved', 'Package.swift') }}
+
       - name: Install Windows App Runtime
         run: |
           $installer = Join-Path $env:RUNNER_TEMP "windowsappruntimeinstall-x64.exe"

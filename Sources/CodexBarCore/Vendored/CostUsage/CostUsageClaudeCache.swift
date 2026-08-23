@@ -11,6 +11,23 @@ struct CostUsageClaudeFileStamp: Equatable, Sendable {
     }
 
     static func read(at url: URL) -> Self? {
+        #if os(Windows)
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let modifiedAt = attributes[.modificationDate] as? Date,
+              let size = (attributes[.size] as? NSNumber)?.int64Value
+        else { return nil }
+        let systemNumber = (attributes[.systemNumber] as? NSNumber)?.stringValue
+        let fileNumber = (attributes[.systemFileNumber] as? NSNumber)?.stringValue
+        let fileID = [systemNumber, fileNumber].compactMap(\.self).joined(separator: ":")
+        let modified = modifiedAt.timeIntervalSince1970
+        let modifiedSeconds = Int64(modified.rounded(.down))
+        let modifiedNanoseconds = Int64((modified - Double(modifiedSeconds)) * 1_000_000_000)
+        return Self(
+            fileID: fileID.isEmpty ? url.standardizedFileURL.path : fileID,
+            size: size,
+            modifiedSeconds: modifiedSeconds,
+            modifiedNanoseconds: modifiedNanoseconds)
+        #else
         var info = stat()
         guard url.path.withCString({ fstatat(AT_FDCWD, $0, &info, 0) }) == 0 else { return nil }
         guard info.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG) else { return nil }
@@ -26,6 +43,7 @@ struct CostUsageClaudeFileStamp: Equatable, Sendable {
             size: Int64(info.st_size),
             modifiedSeconds: modifiedSeconds,
             modifiedNanoseconds: modifiedNanoseconds)
+        #endif
     }
 }
 

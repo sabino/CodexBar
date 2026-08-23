@@ -9,9 +9,9 @@
 - Cross-platform history: guarantee an explicit full historical refresh receives a fresh bounded parsing window after
   discovery, so large archives keep advancing instead of exhausting the time budget before reading session bytes;
   adopt the preceding scheduling-only cache generation without rebuilding its compatible indexed rows.
-- Windows: replace direct CoreFoundation boolean checks with a Foundation-compatible bridge and use native
-  `FileManager` session metadata when POSIX `stat` is unavailable, so the shared provider and history engines compile
-  without changing Linux/macOS cache contents.
+- Windows: add a narrow host compatibility layer around native `Foundation.Process`, Win32 termination, secure atomic
+  credential publishing, bounded directory paging, and `FileManager` session metadata; also gate Darwin-only trust
+  APIs so the shared provider and history engines retain one implementation without changing Linux/macOS cache rows.
 - Cross-platform Swift UI: isolate and deduplicate navigation state, retain visited panes, coalesce GTK resize layout,
   batch refresh publications, and avoid repeatedly measuring native sidebar rows.
 - Cross-platform Swift UI: keep native provider search synchronized and open cached Usage & Spend history without an

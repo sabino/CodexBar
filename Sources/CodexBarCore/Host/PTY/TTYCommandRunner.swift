@@ -1255,6 +1255,9 @@ extension TTYCommandRunner {
 
     private static func normalizedExecutablePath(_ path: String) -> String {
         let expanded = NSString(string: path).expandingTildeInPath
+        #if os(Windows)
+        return URL(fileURLWithPath: expanded).standardizedFileURL.path.lowercased()
+        #else
         var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
         if realpath(expanded, &buffer) != nil {
             return buffer.withUnsafeBufferPointer { rawBuffer in
@@ -1263,11 +1266,19 @@ extension TTYCommandRunner {
             }
         }
         return URL(fileURLWithPath: expanded).standardizedFileURL.path
+        #endif
     }
 
     private static func runWhich(_ tool: String) -> String? {
         let proc = Process()
+        #if os(Windows)
+        let windowsRoot = ProcessInfo.processInfo.environment["SystemRoot"] ?? "C:\\Windows"
+        proc.executableURL = URL(fileURLWithPath: windowsRoot)
+            .appendingPathComponent("System32")
+            .appendingPathComponent("where.exe")
+        #else
         proc.executableURL = URL(fileURLWithPath: "/usr/bin/which")
+        #endif
         proc.arguments = [tool]
         var env = ProcessInfo.processInfo.environment
         let loginPATH = LoginShellPathCache.shared.currentOrCapture()

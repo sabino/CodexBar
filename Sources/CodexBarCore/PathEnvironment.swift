@@ -807,6 +807,9 @@ public enum ShellCommandLocator {
     }
 
     private static func makeCloseOnExecPipe() -> (read: Int32, write: Int32)? {
+        #if os(Windows)
+        return nil
+        #else
         var fds: (read: Int32, write: Int32) = (-1, -1)
         #if os(Linux)
         // Glibc and Musl export pipe2, but their Swift modules do not consistently declare it.
@@ -828,7 +831,40 @@ public enum ShellCommandLocator {
         }
         #endif
         return fds
+        #endif
     }
+
+    #if os(Windows)
+    private static func runWindowsShellCommand(
+        shell: String,
+        arguments: [String],
+        timeout: TimeInterval) -> Data?
+    {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: shell)
+        process.arguments = arguments
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        let termination = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in termination.signal() }
+        do {
+            try process.run()
+        } catch {
+            return nil
+        }
+
+        guard termination.wait(timeout: .now() + max(0, timeout)) == .success else {
+            if process.isRunning { process.terminate() }
+            return nil
+        }
+        guard process.terminationStatus == 0 else { return nil }
+        return stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+    }
+    #endif
 
     // swiftlint:disable cyclomatic_complexity
     /// Runs a shell command, draining both stdout and stderr concurrently so that
@@ -842,6 +878,9 @@ public enum ShellCommandLocator {
         arguments: [String],
         timeout: TimeInterval) -> Data?
     {
+        #if os(Windows)
+        self.runWindowsShellCommand(shell: shell, arguments: arguments, timeout: timeout)
+        #else
         // Darwin needs a lock around raw descriptor creation, close-on-exec flagging,
         // and spawn. Linux creates close-on-exec descriptors atomically with pipe2.
         self.shellSpawnLock.lock()
@@ -1029,6 +1068,7 @@ public enum ShellCommandLocator {
             }
         }
         return stdoutCollector.drain()
+        #endif
     }
 
     // swiftlint:enable cyclomatic_complexity

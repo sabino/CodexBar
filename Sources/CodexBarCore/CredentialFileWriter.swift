@@ -6,6 +6,9 @@ import Glibc
 import Musl
 #endif
 import Foundation
+#if os(Windows)
+import WinSDK
+#endif
 
 /// Writes credential-bearing files (session tokens, cookies) with owner-only (`0600`) permissions
 /// established **before** any bytes are written, then atomically published — the same secure shape
@@ -26,6 +29,31 @@ enum CredentialFileWriter {
         to url: URL,
         beforePublish: ((URL) throws -> Void)? = nil) throws
     {
+        #if os(Windows)
+        let fm = FileManager.default
+        let directory = url.deletingLastPathComponent()
+        try fm.createDirectory(at: directory, withIntermediateDirectories: true)
+        let staged = directory.appendingPathComponent(
+            ".\(url.lastPathComponent).codexbar-staged-\(UUID().uuidString)", isDirectory: false)
+        do {
+            try data.write(to: staged, options: [.withoutOverwriting])
+            try beforePublish?(staged)
+            let moved = staged.path.withCString(encodedAs: UTF16.self) { source in
+                url.path.withCString(encodedAs: UTF16.self) { destination in
+                    MoveFileExW(source, destination, DWORD(MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+                }
+            }
+            guard moved else {
+                throw NSError(
+                    domain: NSWin32ErrorDomain,
+                    code: Int(GetLastError()),
+                    userInfo: [NSFilePathErrorKey: url.path])
+            }
+        } catch {
+            try? fm.removeItem(at: staged)
+            throw error
+        }
+        #else
         let fm = FileManager.default
         let directory = url.deletingLastPathComponent()
         try fm.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -59,17 +87,22 @@ enum CredentialFileWriter {
             try? fm.removeItem(at: staged)
             throw error
         }
+        #endif
     }
 
     /// If `url` exists and is readable by group or others, restrict it to `0600`. Best-effort;
     /// used to remediate credential files created `0644` by earlier builds when they are next read.
     static func repairPermissions(at url: URL) {
+        #if os(Windows)
+        _ = url
+        #else
         let fm = FileManager.default
         guard let attributes = try? fm.attributesOfItem(atPath: url.path),
               let mode = (attributes[.posixPermissions] as? NSNumber)?.uint16Value,
               (mode & 0o077) != 0
         else { return }
         try? fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        #endif
     }
 
     private static func posixError(_ code: Int32, path: String) -> Error {

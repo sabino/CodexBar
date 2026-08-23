@@ -85,6 +85,7 @@ actor CostUsageStore {
         "2d17f4981b78d07f", // Persisted priority-turn cursor; parser and persisted row shape unchanged.
         "99848ef16ca7e069", // Cross-platform manual-refresh scheduling; persisted rows are unchanged.
         "ad52067daa4e07eb", // Windows-only metadata fallback; Linux/macOS persisted rows are unchanged.
+        "4563a0078e5bfa32", // Windows directory paging and Claude stamps; Linux/macOS rows are unchanged.
     ]
 
     /// Test-only crash injection: invoked inside `saveCodexCache`'s transaction after each

@@ -17,6 +17,9 @@ private enum SpawnedProcessGroupTestingOverrides {
 }
 #endif
 
+// The implementation keeps the lifecycle state machine together while isolating
+// platform behavior with compile-time branches.
+// swiftlint:disable:next type_body_length
 package final class SpawnedProcessGroup: @unchecked Sendable {
     package enum LaunchError: LocalizedError {
         case setupFailed(String)
@@ -325,18 +328,21 @@ package final class SpawnedProcessGroup: @unchecked Sendable {
     private let outputTTYs: Set<OutputTTYIdentity>
     private let rootIdentity: TTYProcessTreeTerminator.ProcessIdentity?
     private let reservedPTYPrimaryDescriptor: OwnedFileDescriptorState?
+    private let platformProcess: Process?
 
     private init(
         pid: pid_t,
         outputPipes: Set<OutputPipeIdentity>,
         outputTTYs: Set<OutputTTYIdentity> = [],
-        reservedPTYPrimaryDescriptor: OwnedFileDescriptorState? = nil)
+        reservedPTYPrimaryDescriptor: OwnedFileDescriptorState? = nil,
+        platformProcess: Process? = nil)
     {
         self.pid = pid
         self.processGroup = pid
         self.outputPipes = outputPipes
         self.outputTTYs = outputTTYs
         self.reservedPTYPrimaryDescriptor = reservedPTYPrimaryDescriptor
+        self.platformProcess = platformProcess
         self.rootIdentity = TTYProcessTreeTerminator.processIdentity(for: pid)
         self.startWaiter()
     }
@@ -356,6 +362,26 @@ package final class SpawnedProcessGroup: @unchecked Sendable {
         stdoutPipe: Pipe,
         stderrPipe: Pipe) throws -> SpawnedProcessGroup
     {
+        #if os(Windows)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: binary)
+        process.arguments = arguments
+        process.environment = environment
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+        do {
+            try process.run()
+        } catch {
+            throw LaunchError.spawnFailed(error.localizedDescription)
+        }
+        stdoutPipe.fileHandleForWriting.closeFile()
+        stderrPipe.fileHandleForWriting.closeFile()
+        return SpawnedProcessGroup(
+            pid: pid_t(truncatingIfNeeded: process.processIdentifier),
+            outputPipes: [],
+            platformProcess: process)
+        #else
         #if canImport(Darwin)
         var fileActions: posix_spawn_file_actions_t?
         #else
@@ -448,6 +474,7 @@ package final class SpawnedProcessGroup: @unchecked Sendable {
             throw LaunchError.spawnFailed(String(cString: strerror(spawnResult)))
         }
         return SpawnedProcessGroup(pid: pid, outputPipes: outputPipes)
+        #endif
     }
 
     package static func launchPTY(
@@ -457,6 +484,14 @@ package final class SpawnedProcessGroup: @unchecked Sendable {
         workingDirectory: URL?,
         fileDescriptors: (primary: Int32, secondary: Int32)) throws -> SpawnedProcessGroup
     {
+        #if os(Windows)
+        _ = binary
+        _ = arguments
+        _ = environment
+        _ = workingDirectory
+        _ = fileDescriptors
+        throw LaunchError.setupFailed("pseudo-terminals are unavailable on Windows")
+        #else
         let primaryFD = fileDescriptors.primary
         let secondaryFD = fileDescriptors.secondary
         guard let outputTTY = OutputTTYIdentity.resolve(fileDescriptor: secondaryFD) else {
@@ -558,10 +593,15 @@ package final class SpawnedProcessGroup: @unchecked Sendable {
             outputPipes: [],
             outputTTYs: [outputTTY],
             reservedPTYPrimaryDescriptor: reservedPTYPrimaryDescriptor)
+        #endif
     }
 
     package var isRunning: Bool {
+        #if os(Windows)
+        self.platformProcess?.isRunning ?? false
+        #else
         !self.termination.hasObservedExit
+        #endif
     }
 
     package var terminationStatus: Int32? {
@@ -573,11 +613,29 @@ package final class SpawnedProcessGroup: @unchecked Sendable {
     }
 
     package var hasResidualProcessGroup: Bool {
+        #if os(Windows)
+        self.isRunning
+        #else
         Self.processGroupExists(self.processGroup)
+        #endif
     }
 
     @discardableResult
     package func terminateSynchronously(grace: TimeInterval = 0.4) -> Int32? {
+        #if os(Windows)
+        guard let process = self.platformProcess else { return self.terminationStatus }
+        if process.isRunning {
+            process.terminate()
+            let deadline = Date().addingTimeInterval(max(0, grace))
+            while process.isRunning, Date() < deadline {
+                usleep(20000)
+            }
+        }
+        if process.isRunning {
+            _ = kill(self.pid, SIGKILL)
+        }
+        return self.finishSynchronously()
+        #else
         let deadline = Date().addingTimeInterval(max(0, grace))
         var processIdentities = self.currentResidualProcessIdentities(includeDescendants: true)
         processIdentities.formUnion(self.currentProcessGroupMemberIdentities())
@@ -608,6 +666,7 @@ package final class SpawnedProcessGroup: @unchecked Sendable {
             usleep(20000)
         }
         return self.finishSynchronously()
+        #endif
     }
 
     /// Abort a process whose output channel is no longer safe to inspect.
@@ -617,6 +676,9 @@ package final class SpawnedProcessGroup: @unchecked Sendable {
     /// group so TERM-to-KILL escalation remains bounded even when process enumeration is slow under load.
     @discardableResult
     package func abortSynchronously(grace: TimeInterval = 0.4) -> Int32? {
+        #if os(Windows)
+        return self.terminateSynchronously(grace: grace)
+        #else
         let grace = max(0, grace)
         let termDeadline = Date().addingTimeInterval(grace)
         var processIdentities = self.currentAbortProcessIdentities()
@@ -637,6 +699,7 @@ package final class SpawnedProcessGroup: @unchecked Sendable {
             usleep(20000)
         }
         return self.finishSynchronously()
+        #endif
     }
 
     @discardableResult
@@ -651,6 +714,9 @@ package final class SpawnedProcessGroup: @unchecked Sendable {
 
     @discardableResult
     package func terminate(grace: TimeInterval = 0.4) async -> Int32? {
+        #if os(Windows)
+        return self.terminateSynchronously(grace: grace)
+        #else
         if self.isRunning {
             let killDeadline = Date().addingTimeInterval(max(0, grace))
             var processIdentities = self.currentResidualProcessIdentities(includeDescendants: true)
@@ -685,9 +751,13 @@ package final class SpawnedProcessGroup: @unchecked Sendable {
         await self.terminateResidualProcesses(grace: grace)
         await self.finish()
         return self.terminationStatus
+        #endif
     }
 
     package func terminateResidualProcesses(grace: TimeInterval = 0.4) async {
+        #if os(Windows)
+        _ = self.terminateSynchronously(grace: grace)
+        #else
         let deadline = Date().addingTimeInterval(max(0, grace))
         var processIdentities = self.currentResidualProcessIdentities(includeDescendants: false)
         processIdentities.formUnion(self.currentProcessGroupMemberIdentities())
@@ -717,6 +787,7 @@ package final class SpawnedProcessGroup: @unchecked Sendable {
         }
         Self.signal(processIdentities: processIdentities, signal: SIGKILL)
         _ = await self.waitForResidualProcessesExit(processIdentities, timeout: grace)
+        #endif
     }
 
     package func finish() async {
@@ -725,6 +796,18 @@ package final class SpawnedProcessGroup: @unchecked Sendable {
     }
 
     private func startWaiter() {
+        #if os(Windows)
+        guard let process = self.platformProcess else {
+            self.termination.observeExit()
+            self.termination.resolve(1)
+            return
+        }
+        let termination = self.termination
+        process.terminationHandler = { process in
+            termination.observeExit()
+            termination.resolve(process.terminationStatus)
+        }
+        #else
         let pid = self.pid
         let processGroup = self.processGroup
         let observedProcessGroupMembers = self.observedProcessGroupMembers
@@ -757,6 +840,7 @@ package final class SpawnedProcessGroup: @unchecked Sendable {
             let status = result == pid ? Self.exitStatus(from: rawStatus) : 1
             termination.resolve(status)
         }
+        #endif
     }
 
     private func waitForExit(timeout: TimeInterval) async -> Int32? {
