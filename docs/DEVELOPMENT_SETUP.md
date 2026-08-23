@@ -1,12 +1,26 @@
 ---
-summary: "Development setup: stable signing and reducing Keychain prompts."
+summary: "Development setup for cross-platform Swift toolchains and original macOS signing."
 read_when:
   - Setting up local development
   - Reducing Keychain prompts during rebuilds
   - Configuring dev signing
+  - Building CodexBarCross on Linux, macOS, or Windows
 ---
 
 # Development Setup Guide
+
+## Cross-platform toolchains
+
+`CodexBarCross` requires Swift 6.2.1 or newer and the platform's native UI toolchain:
+
+- Linux: Clang, GTK 4 and GLib development headers, SQLite development headers, and `pkg-config`.
+- macOS: Xcode 26 or a compatible Swift 6.2.1 toolchain.
+- Windows: Swift 6.2.1, Visual Studio 2022 with the Windows SDK, vcpkg `sqlite3:x64-windows`, and Windows App Runtime
+  `1.5.240205001-preview1` for launching the WinUI build.
+
+Start with `swift build --product CodexBarCross`. The complete commands and release layouts are in
+[Cross-platform desktop app](CROSS_PLATFORM.md). The signing and Keychain guidance below applies to the original
+macOS app.
 
 ## Reducing Keychain Permission Prompts
 
@@ -91,6 +105,14 @@ The build script creates `CodexBar.app` in the project root. Old numbered builds
 ## Development Workflow
 
 ### Standard Build & Run
+
+For the cross-platform app:
+
+```bash
+swift run CodexBarCross
+```
+
+For the original macOS app:
 
 ```bash
 ./Scripts/compile_and_run.sh

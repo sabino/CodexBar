@@ -41,6 +41,10 @@ check_package_product_paths() {
   "${ROOT_DIR}/Scripts/test_package_product_paths.sh"
 }
 
+check_cross_platform_package() {
+  "${ROOT_DIR}/Scripts/test_package_cross_platform_app.sh"
+}
+
 check_package_strip() {
   "${ROOT_DIR}/Scripts/test_package_strip.sh"
 }
@@ -116,6 +120,7 @@ run_portable_checks() {
   check_provider_manifests
   check_plugin_javascript
   check_package_product_paths
+  check_cross_platform_package
   check_package_strip
   check_package_signing
   check_package_info_plist

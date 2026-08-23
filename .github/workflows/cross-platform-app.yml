@@ -1,0 +1,352 @@
+name: Cross-platform app
+
+on:
+  push:
+    branches: [main, feat/cross-platform-swift]
+    tags: ["v*-cross.*"]
+    paths:
+      - ".github/workflows/cross-platform-app.yml"
+      - ".github/workflows/release-cli.yml"
+      - "Package.swift"
+      - "Package.resolved"
+      - "Sources/CodexBarCore/**"
+      - "Sources/CodexBarCross/**"
+      - "Sources/CodexBarCrossSupport/**"
+      - "Sources/CPlatformTray/**"
+      - "Sources/CGIO/**"
+      - "Sources/CGdkX11/**"
+      - "Scripts/package_cross_platform_app.sh"
+      - "Scripts/package_cross_platform_windows.ps1"
+      - "Scripts/test_package_cross_platform_app.sh"
+      - "docs/CROSS_PLATFORM.md"
+  pull_request:
+    paths:
+      - ".github/workflows/cross-platform-app.yml"
+      - "Package.swift"
+      - "Package.resolved"
+      - "Sources/CodexBarCore/**"
+      - "Sources/CodexBarCross/**"
+      - "Sources/CodexBarCrossSupport/**"
+      - "Sources/CPlatformTray/**"
+      - "Sources/CGIO/**"
+      - "Sources/CGdkX11/**"
+      - "Scripts/package_cross_platform_app.sh"
+      - "Scripts/package_cross_platform_windows.ps1"
+      - "Scripts/test_package_cross_platform_app.sh"
+      - "docs/CROSS_PLATFORM.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cross-platform-app-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+env:
+  SWIFT_VERSION: 6.2.1
+
+jobs:
+  build-linux:
+    name: Linux x86_64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    container: swift:6.2.1-noble
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install native dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            binutils clang dbus-x11 file libglib2.0-dev libgtk-4-dev libsqlite3-dev pkg-config xvfb
+
+      - name: Resolve package version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" == refs/tags/v*-cross.* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            source version.env
+            version="${MARKETING_VERSION}-dev.${GITHUB_SHA:0:7}"
+          fi
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build release executable
+        id: build
+        shell: bash
+        run: |
+          set -euo pipefail
+          swift --version
+          swift build -c release --product CodexBarCross
+          bin_dir="$(swift build -c release --product CodexBarCross --show-bin-path)"
+          echo "bin_dir=$bin_dir" >> "$GITHUB_OUTPUT"
+          file "$bin_dir/CodexBarCross"
+
+      - name: Package
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          output_dir="$RUNNER_TEMP/codexbar-cross-assets"
+          asset="$(./Scripts/package_cross_platform_app.sh \
+            linux "${{ steps.version.outputs.value }}" x86_64 \
+            "${{ steps.build.outputs.bin_dir }}" "$output_dir" | tail -n1)"
+          echo "asset=$asset" >> "$GITHUB_OUTPUT"
+
+      - name: Packaged launch smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          verify_dir="$RUNNER_TEMP/codexbar-cross-linux-verify"
+          mkdir -p "$verify_dir"
+          tar -xzf "${{ steps.package.outputs.asset }}" -C "$verify_dir"
+          executable="$verify_dir/CodexBarCross/CodexBarCross"
+          set +e
+          LD_LIBRARY_PATH="$verify_dir/CodexBarCross" \
+            timeout 10s dbus-run-session -- xvfb-run -a "$executable" \
+            > "$RUNNER_TEMP/codexbar-cross-linux.log" 2>&1
+          status=$?
+          set -e
+          if [[ "$status" -ne 124 ]]; then
+            cat "$RUNNER_TEMP/codexbar-cross-linux.log" >&2
+            echo "Packaged CodexBarCross exited before the smoke-test timeout (status $status)." >&2
+            exit 1
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: codexbar-cross-linux-x86_64
+          path: |
+            ${{ steps.package.outputs.asset }}
+            ${{ steps.package.outputs.asset }}.sha256
+          if-no-files-found: error
+
+  build-macos:
+    name: macOS ${{ matrix.architecture }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-26
+            architecture: arm64
+          - runner: macos-15-intel
+            architecture: x86_64
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Select Xcode 26
+        run: |
+          set -euo pipefail
+          for candidate in /Applications/Xcode_26.3.app /Applications/Xcode_26.2.app; do
+            if [[ -d "$candidate" ]]; then
+              sudo xcode-select -s "$candidate/Contents/Developer"
+              break
+            fi
+          done
+          swift --version
+
+      - name: Resolve package version
+        id: version
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" == refs/tags/v*-cross.* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            source version.env
+            version="${MARKETING_VERSION}-dev.${GITHUB_SHA:0:7}"
+          fi
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build release executable
+        id: build
+        run: |
+          set -euo pipefail
+          swift build -c release --product CodexBarCross --arch "${{ matrix.architecture }}"
+          bin_dir="$(swift build -c release --product CodexBarCross \
+            --arch "${{ matrix.architecture }}" --show-bin-path)"
+          lipo -archs "$bin_dir/CodexBarCross" | tr ' ' '\n' | grep -Fx "${{ matrix.architecture }}"
+          echo "bin_dir=$bin_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Launch smoke test
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/codexbar-cross-macos.log"
+          "${{ steps.build.outputs.bin_dir }}/CodexBarCross" > "$log" 2>&1 &
+          pid=$!
+          sleep 8
+          if ! kill -0 "$pid" 2>/dev/null; then
+            wait "$pid" || status=$?
+            cat "$log" >&2
+            echo "CodexBarCross exited during launch smoke test (status ${status:-0})." >&2
+            exit 1
+          fi
+          kill "$pid"
+          wait "$pid" || true
+
+      - name: Package app bundle
+        id: package
+        run: |
+          set -euo pipefail
+          output_dir="$RUNNER_TEMP/codexbar-cross-assets"
+          asset="$(./Scripts/package_cross_platform_app.sh \
+            macos "${{ steps.version.outputs.value }}" "${{ matrix.architecture }}" \
+            "${{ steps.build.outputs.bin_dir }}" "$output_dir" | tail -n1)"
+          echo "asset=$asset" >> "$GITHUB_OUTPUT"
+
+      - name: Verify packaged app
+        run: |
+          set -euo pipefail
+          verify_dir="$RUNNER_TEMP/codexbar-cross-verify"
+          mkdir -p "$verify_dir"
+          ditto -x -k "${{ steps.package.outputs.asset }}" "$verify_dir"
+          plutil -lint "$verify_dir/CodexBarCross.app/Contents/Info.plist"
+          codesign --verify --deep --strict --verbose=2 "$verify_dir/CodexBarCross.app"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: codexbar-cross-macos-${{ matrix.architecture }}
+          path: |
+            ${{ steps.package.outputs.asset }}
+            ${{ steps.package.outputs.asset }}.sha256
+          if-no-files-found: error
+
+  build-windows:
+    name: Windows x86_64
+    runs-on: windows-2025
+    timeout-minutes: 100
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Setup Visual Studio environment
+        uses: seanmiddleditch/gha-setup-vsdevenv@cf96bf5b227cac6af28c04c4a4e69286ea444163 # v5
+
+      - name: Install Swift ${{ env.SWIFT_VERSION }}
+        uses: compnerd/gha-setup-swift@581df1ffa3f3e786ddc73ff37364ee231f9644c5 # v0.3.0
+        with:
+          branch: swift-6.2.1-release
+          tag: 6.2.1-RELEASE
+
+      - name: Install SQLite
+        run: |
+          vcpkg install sqlite3:x64-windows
+          $installed = Join-Path $env:VCPKG_INSTALLATION_ROOT "installed/x64-windows"
+          "LIB=$(Join-Path $installed 'lib');$env:LIB" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "INCLUDE=$(Join-Path $installed 'include');$env:INCLUDE" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          (Join-Path $installed "bin") | Out-File $env:GITHUB_PATH -Append -Encoding utf8
+          "CODEXBAR_SQLITE3_LIB_DIR=$(Join-Path $installed 'lib')" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "CODEXBAR_VCPKG_BIN_DIR=$(Join-Path $installed 'bin')" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Resolve package version
+        id: version
+        run: |
+          if ($env:GITHUB_REF -like "refs/tags/v*-cross.*") {
+              $version = $env:GITHUB_REF_NAME.Substring(1)
+          } else {
+              $versionLine = Get-Content version.env | Where-Object { $_ -like "MARKETING_VERSION=*" }
+              $marketingVersion = $versionLine.Substring("MARKETING_VERSION=".Length)
+              $version = "$marketingVersion-dev.$($env:GITHUB_SHA.Substring(0, 7))"
+          }
+          "value=$version" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Build release executable
+        id: build
+        run: |
+          swift --version
+          swift build -c release --product CodexBarCross -j 2
+          $binDirectory = swift build -c release --product CodexBarCross --show-bin-path
+          if (-not (Test-Path (Join-Path $binDirectory "CodexBarCross.exe"))) {
+              throw "CodexBarCross.exe was not produced in $binDirectory"
+          }
+          "bin_dir=$binDirectory" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Install Windows App Runtime
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP "windowsappruntimeinstall-x64.exe"
+          curl.exe -fL "https://aka.ms/windowsappsdk/1.5/1.5.240205001-preview1/windowsappruntimeinstall-x64.exe" `
+              -o $installer
+          $process = Start-Process -FilePath $installer -ArgumentList "--quiet" -Wait -PassThru
+          if ($process.ExitCode -notin @(0, 3010)) {
+              throw "Windows App Runtime installer failed with exit code $($process.ExitCode)"
+          }
+
+      - name: Launch smoke test
+        run: |
+          $executable = Join-Path "${{ steps.build.outputs.bin_dir }}" "CodexBarCross.exe"
+          $process = Start-Process -FilePath $executable -WorkingDirectory "${{ steps.build.outputs.bin_dir }}" -PassThru
+          Start-Sleep -Seconds 8
+          if ($process.HasExited) {
+              throw "CodexBarCross exited during launch smoke test with code $($process.ExitCode)"
+          }
+          Stop-Process -Id $process.Id -Force
+
+      - name: Package
+        id: package
+        run: |
+          $outputDirectory = Join-Path $env:RUNNER_TEMP "codexbar-cross-assets"
+          $asset = ./Scripts/package_cross_platform_windows.ps1 `
+              -Version "${{ steps.version.outputs.value }}" `
+              -Architecture "x86_64" `
+              -BinDirectory "${{ steps.build.outputs.bin_dir }}" `
+              -OutputDirectory $outputDirectory | Select-Object -Last 1
+          "asset=$asset" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: codexbar-cross-windows-x86_64
+          path: |
+            ${{ steps.package.outputs.asset }}
+            ${{ steps.package.outputs.asset }}.sha256
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish fork release
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-cross.') }}
+    needs: [build-linux, build-macos, build-windows]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          pattern: codexbar-cross-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t assets < <(find release-assets -maxdepth 1 -type f -print | sort)
+          if [[ "${#assets[@]}" -ne 8 ]]; then
+            printf 'Expected 8 release files, found %d:\n' "${#assets[@]}" >&2
+            printf '%s\n' "${assets[@]}" >&2
+            exit 1
+          fi
+          notes="$RUNNER_TEMP/codexbar-cross-release-notes.md"
+          cat > "$notes" <<'EOF'
+          Native SwiftCrossUI desktop builds from the CodexBar shared Swift core.
+
+          - Linux x86_64: GTK 4 desktop executable with the required Swift runtime libraries bundled beside it.
+          - macOS arm64 and x86_64: ad-hoc-signed app bundles for this fork (not Apple-notarized).
+          - Windows x86_64: WinUI executable with its Swift runtime and resource payload.
+
+          See `README.md` inside each archive and `docs/CROSS_PLATFORM.md` in the repository for runtime requirements.
+          EOF
+          gh release create "$GITHUB_REF_NAME" "${assets[@]}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "CodexBar Cross ${GITHUB_REF_NAME#v}" \
+            --notes-file "$notes" \
+            --prerelease

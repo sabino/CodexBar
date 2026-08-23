@@ -11,6 +11,10 @@ read_when:
 CodexBar reads a single JSON config file for CLI and app provider settings.
 API keys, manual cookie headers, source selection, ordering, and token accounts live here. Keychain is still used for runtime cookie caches, browser Safe Storage access, and provider OAuth/device-flow credentials where those flows require it.
 
+The original macOS app, CLI, and `CodexBarCross` all resolve this same provider config. Portable UI-only choices such
+as renderer mode, sidebar width, and history visibility are stored separately in `CodexBarCross` user defaults so
+they do not change provider behavior or the upstream macOS preferences schema.
+
 ## Location
 - `CODEXBAR_CONFIG=/path/to/config.json` when set.
 - `$XDG_CONFIG_HOME/codexbar/config.json` when `XDG_CONFIG_HOME` is set to an absolute path. Relative values are

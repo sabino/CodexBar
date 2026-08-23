@@ -1,9 +1,10 @@
 ---
-summary: "Development workflow: build/run scripts, logging, and keychain migration notes."
+summary: "Development workflow for the shared Swift core, cross-platform desktop app, and original macOS app."
 read_when:
   - Starting local development
   - Running build/test scripts
   - Troubleshooting Keychain prompts in dev
+  - Working on CodexBarCross
 ---
 
 # CodexBar Development Guide
@@ -11,6 +12,15 @@ read_when:
 ## Quick Start
 
 ### Building and Running
+
+Cross-platform desktop app:
+
+```bash
+swift build --product CodexBarCross
+swift run CodexBarCross
+```
+
+The original macOS app:
 
 ```bash
 # Full build, package, and launch (recommended)
@@ -28,8 +38,10 @@ read_when:
 
 ### Development Workflow
 
-1. **Make code changes** in `Sources/CodexBar/`
-2. **Run** `./Scripts/compile_and_run.sh --test` to test, rebuild, and launch
+1. **Make shared provider changes** in `Sources/CodexBarCore/`, original macOS UI changes in `Sources/CodexBar/`, and
+   portable UI changes in `Sources/CodexBarCross/`.
+2. **Run** `swift run CodexBarCross` for the shared desktop UI, or `./Scripts/compile_and_run.sh --test` for the
+   original macOS bundle.
 3. **Check logs** in Console.app (filter by "codexbar")
 4. **Optional file log**: enable Debug → Logging → "Enable file logging" to write
    `~/Library/Logs/CodexBar/CodexBar.log` (verbosity defaults to "Verbose")
@@ -96,6 +108,9 @@ CodexBar/
 │   ├── OpenAIWeb/             # OpenAI dashboard integration helpers
 │   ├── WebKit/                # Web session helpers
 │   └── Vendored/              # Embedded support code
+├── Sources/CodexBarCross/     # SwiftCrossUI app shared by Linux, macOS, and Windows
+├── Sources/CodexBarCrossSupport/ # Renderer-neutral state and performance helpers
+├── Sources/CPlatformTray/     # Linux/macOS/Windows native tray shim
 ├── Sources/CodexBarCLI/       # Bundled codexbar command-line tool
 ├── Sources/CodexBarWidget/    # WidgetKit support
 ├── WidgetExtension/           # Xcode wrapper for the packaged widget extension
@@ -118,7 +133,8 @@ See the canonical [provider authoring guide](provider.md#adding-a-new-provider) 
 5. Add the provider's exhaustive switch case to
    `Sources/CodexBar/Providers/Shared/ProviderImplementationRegistry.swift`.
 6. Add icon assets under `Sources/CodexBar/Resources/`.
-7. Add focused tests under `Tests/CodexBarTests/` and, for CLI/core behavior that must run on Linux, `TestsLinux/`.
+7. Regenerate portable provider artwork when the icon changes with `Scripts/generate_cross_provider_icons.py`.
+8. Add focused tests under `Tests/CodexBarTests/` and, for CLI/core or portable UI behavior, `TestsLinux/`.
 
 ### Debug Cookie Issues
 1. Enable Debug → Logging → "Enable file logging" or raise verbosity in the app settings.
@@ -140,6 +156,19 @@ swiftlint --strict
 
 ## Distribution
 
+### Cross-platform desktop archives
+
+```bash
+# Linux example
+swift build -c release --product CodexBarCross
+bin_dir="$(swift build -c release --product CodexBarCross --show-bin-path)"
+./Scripts/package_cross_platform_app.sh linux 0.0.0-dev x86_64 "$bin_dir" /tmp/codexbar-assets
+```
+
+macOS uses the same script with `macos`; Windows uses `Scripts/package_cross_platform_windows.ps1`. See
+[Cross-platform desktop app](CROSS_PLATFORM.md) for dependencies, archive layouts, renderer behavior, and CI release
+tags.
+
 ### Local Development Build
 ```bash
 ./Scripts/package_app.sh
@@ -152,11 +181,17 @@ swiftlint --strict
 # Creates: CodexBar-<version>.zip and CodexBar-<version>.dSYM.zip
 ```
 
-See `docs/RELEASING.md` for full release process.
+See `docs/RELEASING.md` for both release processes.
 
 ## Troubleshooting
 
 ### App Won't Launch
+
+For `CodexBarCross`, run the executable from a terminal first and verify the host dependencies in
+[CROSS_PLATFORM.md](CROSS_PLATFORM.md). Linux tray visibility also depends on a StatusNotifier host.
+
+For the original macOS app:
+
 ```bash
 # Check crash logs
 ls -lt ~/Library/Logs/DiagnosticReports/CodexBar* | head -5

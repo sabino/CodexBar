@@ -13,7 +13,7 @@ let sweetCookieKitDependency: Package.Dependency =
 let sqlite3LibDir = ProcessInfo.processInfo.environment["CODEXBAR_SQLITE3_LIB_DIR"]?
     .trimmingCharacters(in: .whitespacesAndNewlines)
 let sqlite3LinkerSettings: [LinkerSetting] = if let sqlite3LibDir, !sqlite3LibDir.isEmpty {
-    [.unsafeFlags(["-L\(sqlite3LibDir)"], .when(platforms: [.linux]))]
+    [.unsafeFlags(["-L\(sqlite3LibDir)"], .when(platforms: [.linux, .windows]))]
 } else {
     []
 }
@@ -120,7 +120,7 @@ let package = Package(
                 name: "CodexBarCore",
                 dependencies: [
                     "CQuickJS",
-                    .target(name: "CSQLite3", condition: .when(platforms: [.linux])),
+                    .target(name: "CSQLite3", condition: .when(platforms: [.linux, .windows])),
                     .product(name: "Crypto", package: "swift-crypto"),
                     .product(name: "Logging", package: "swift-log"),
                     .product(name: "SweetCookieKit", package: "SweetCookieKit"),
@@ -233,7 +233,7 @@ let package = Package(
                     "CodexBarCore",
                     "CodexBarCrossSupport",
                     "CodexBarCLI",
-                    .target(name: "CSQLite3", condition: .when(platforms: [.linux])),
+                    .target(name: "CSQLite3", condition: .when(platforms: [.linux, .windows])),
                 ],
                 path: "TestsLinux",
                 swiftSettings: [

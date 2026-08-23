@@ -2,6 +2,10 @@
 
 ## 0.54.2 — Unreleased
 
+- Cross-platform Swift UI: remove the redundant footer Settings action from the compact window; the title-bar gear is
+  now the single Settings entry point.
+- Distribution: build, smoke-test, checksum, and publish native SwiftCrossUI desktop archives for Linux x86_64,
+  macOS arm64/x86_64, and Windows x86_64 from the fork's GitHub Actions workflow.
 - Cross-platform Swift UI: isolate and deduplicate navigation state, retain visited panes, coalesce GTK resize layout,
   batch refresh publications, and avoid repeatedly measuring native sidebar rows.
 - Cross-platform Swift UI: keep native provider search synchronized and open cached Usage & Spend history without an

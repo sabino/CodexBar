@@ -226,17 +226,10 @@ struct CodexBarMiniView: View {
                     PlatformWindowController.shared.hideMini()
                 }
             }
-            HStack {
-                Text(self.updatedText)
-                    .font(.caption)
-                    .foregroundColor(CodexBarPalette.tertiaryText)
-                Spacer()
-                Button("Settings…") {
-                    PlatformWindowController.shared.hideMini()
-                    self.openWindow(id: "settings")
-                }
-                .buttonStyle(.plain)
-            }
+            Text(self.updatedText)
+                .font(.caption)
+                .foregroundColor(CodexBarPalette.tertiaryText)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)

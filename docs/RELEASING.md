@@ -1,12 +1,51 @@
 ---
-summary: "CodexBar release checklist: package, sign, notarize, appcast, and asset validation."
+summary: "Release cross-platform fork archives or the signed original macOS app and CLI."
 read_when:
   - Starting a CodexBar release
   - Updating signing/notarization or appcast steps
   - Validating release assets or Sparkle feed
+  - Publishing a v*-cross.* fork release
 ---
 
 # Release process (CodexBar)
+
+This repository has two independent release tracks:
+
+- **Original macOS app and CLI:** signed, notarized, Sparkle-enabled upstream process documented below.
+- **Native cross-platform desktop app:** reproducible fork artifacts built by GitHub Actions from a `v*-cross.*` tag.
+
+## Cross-platform fork release
+
+Use a tag based on the upstream version plus a fork revision, for example `v0.54.1-cross.1`. Do not change
+`version.env`, the Sparkle appcast, or the upstream macOS release metadata for a cross-only release.
+
+Before tagging:
+
+```bash
+./Scripts/test_package_cross_platform_app.sh
+make check
+make test
+git push origin HEAD:main
+```
+
+Wait for the branch/main run of `.github/workflows/cross-platform-app.yml` to pass on Linux x86_64, macOS arm64,
+macOS x86_64, and Windows x86_64. Then push the tag:
+
+```bash
+git tag v0.54.1-cross.1
+git push origin v0.54.1-cross.1
+```
+
+The tag run rebuilds and smoke-tests every executable, creates archives and SHA-256 files, and publishes a prerelease
+to `sabino/CodexBar`. Verify all eight assets, download them into a temporary directory, check the hashes, and inspect
+each archive before declaring the release complete. Cross tags are intentionally excluded from `release-cli.yml`, so
+they cannot update the upstream Homebrew tap or macOS appcast.
+
+The fork macOS app bundles are ad-hoc signed and not notarized. This release track must not be presented as a
+replacement for the Developer ID-signed original macOS release. See [Cross-platform desktop app](CROSS_PLATFORM.md)
+for runtime requirements and archive contents.
+
+## Original macOS release
 
 SwiftPM-only; package/sign/notarize manually (no Xcode project). The Sparkle feed is served from `appcast.xml` on `main`, with enclosures hosted on GitHub Releases. Checklist below merges Trimmy’s release flow with CodexBar specifics.
 
