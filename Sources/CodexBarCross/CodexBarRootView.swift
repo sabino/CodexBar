@@ -895,11 +895,13 @@ extension CodexBarRootView {
         content()
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(CodexBarPalette.cardBackground)
-            .cornerRadius(12)
-            .overlay {
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(CodexBarPalette.cardBorder, style: StrokeStyle(width: 1))
+            .background {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(CodexBarPalette.cardBackground)
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(CodexBarPalette.cardBorder, style: StrokeStyle(width: 1))
+                }
             }
     }
 
@@ -947,8 +949,8 @@ extension CodexBarRootView {
                     .foregroundColor(CodexBarPalette.secondaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Picker(
-                of: options,
+            PlatformPicker(
+                options: options,
                 selection: Binding<String?>(
                     get: { self.model.preferences[keyPath: keyPath] },
                     set: { value in
