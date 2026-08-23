@@ -291,6 +291,12 @@ enum CostUsageJsonl {
             onLine: onLine).committedOffset
     }
 
+    // Swift 6.2.1 on Windows asserts in OwnershipModelEliminator while optimizing
+    // this closure-heavy streaming loop. Isolate the workaround to this function;
+    // Linux and macOS retain the normal release optimizer.
+    #if os(Windows)
+    @_optimize(none)
+    #endif
     // swiftlint:disable:next function_parameter_count
     static func scanBounded(
         fileURL: URL,
