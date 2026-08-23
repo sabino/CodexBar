@@ -204,12 +204,12 @@ struct CostUsageAggregateSnapshotLinuxTests {
     }
 
     @Test
-    func `lazy scanner adopts the current upstream cache without rebuilding`() async {
+    func `lazy scanner adopts the immediate predecessor cache without rebuilding`() async {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("CodexBar-UpstreamCacheAdoption-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let predecessorHash = "99848ef16ca7e069"
+        let predecessorHash = "ad52067daa4e07eb"
         #expect(CostUsageStore.compatiblePredecessorParserHashes.contains(predecessorHash))
         let predecessorVersion = CostUsageStore.combinedSchemaVersion(
             base: CostUsageStore.baseSchemaVersion,

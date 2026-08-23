@@ -9,8 +9,9 @@
 - Cross-platform history: guarantee an explicit full historical refresh receives a fresh bounded parsing window after
   discovery, so large archives keep advancing instead of exhausting the time budget before reading session bytes;
   adopt the preceding scheduling-only cache generation without rebuilding its compatible indexed rows.
-- Windows: replace direct CoreFoundation boolean checks with a Foundation-compatible bridge so the shared provider
-  engines and account readers compile on Windows without changing their serialized behavior.
+- Windows: replace direct CoreFoundation boolean checks with a Foundation-compatible bridge and use native
+  `FileManager` session metadata when POSIX `stat` is unavailable, so the shared provider and history engines compile
+  without changing Linux/macOS cache contents.
 - Cross-platform Swift UI: isolate and deduplicate navigation state, retain visited panes, coalesce GTK resize layout,
   batch refresh publications, and avoid repeatedly measuring native sidebar rows.
 - Cross-platform Swift UI: keep native provider search synchronized and open cached Usage & Spend history without an
