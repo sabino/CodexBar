@@ -12,7 +12,7 @@ import WinSDK
 // needs real Windows semantics is implemented with Foundation.Process; the
 // spawn and PTY entry points below deliberately report ENOSYS so callers fail
 // soft instead of attempting Unix behavior on Windows.
-typealias pid_t = Int32
+package typealias pid_t = Int32
 typealias mode_t = Int32
 typealias id_t = UInt32
 

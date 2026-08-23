@@ -45,7 +45,7 @@ enum CredentialFileWriter {
             }
             guard moved else {
                 throw NSError(
-                    domain: NSWin32ErrorDomain,
+                    domain: "NSWin32ErrorDomain",
                     code: Int(GetLastError()),
                     userInfo: [NSFilePathErrorKey: url.path])
             }
