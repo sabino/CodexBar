@@ -61,6 +61,14 @@ jobs:
           DEBIAN_FRONTEND=noninteractive apt-get install -y \
             binutils clang dbus-x11 file libglib2.0-dev libgtk-4-dev libsqlite3-dev pkg-config xvfb
 
+      - name: Restore SwiftPM build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .build
+          key: swiftpm-cross-linux-x86_64-${{ env.SWIFT_VERSION }}-${{ hashFiles('Package.resolved', 'Package.swift') }}
+          restore-keys: |
+            swiftpm-cross-linux-x86_64-${{ env.SWIFT_VERSION }}-
+
       - name: Resolve package version
         id: version
         shell: bash
@@ -151,6 +159,14 @@ jobs:
           done
           swift --version
 
+      - name: Restore SwiftPM build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .build
+          key: swiftpm-cross-macos-${{ matrix.architecture }}-${{ hashFiles('Package.resolved', 'Package.swift') }}
+          restore-keys: |
+            swiftpm-cross-macos-${{ matrix.architecture }}-
+
       - name: Resolve package version
         id: version
         run: |
@@ -219,7 +235,9 @@ jobs:
 
   build-windows:
     name: Windows x86_64
-    runs-on: windows-2025
+    # Swift 6.2.1 ships Clang 19. Visual Studio 2026's STL requires Clang 20,
+    # so keep this build on the VS 2022 runner until the Swift toolchain moves.
+    runs-on: windows-2022
     timeout-minutes: 100
     defaults:
       run:
@@ -245,6 +263,14 @@ jobs:
           (Join-Path $installed "bin") | Out-File $env:GITHUB_PATH -Append -Encoding utf8
           "CODEXBAR_SQLITE3_LIB_DIR=$(Join-Path $installed 'lib')" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
           "CODEXBAR_VCPKG_BIN_DIR=$(Join-Path $installed 'bin')" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Restore SwiftPM build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .build
+          key: swiftpm-cross-windows-x86_64-${{ env.SWIFT_VERSION }}-${{ hashFiles('Package.resolved', 'Package.swift') }}
+          restore-keys: |
+            swiftpm-cross-windows-x86_64-${{ env.SWIFT_VERSION }}-
 
       - name: Resolve package version
         id: version
