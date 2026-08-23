@@ -110,6 +110,7 @@ extension CostUsageFetcher {
                     codexHomePath: codexHomePath,
                     historyDays: historyDays,
                     maximumScanDurationPerRefresh: Self.codexManualScanDurationPerRefresh,
+                    renewScanDurationBeforeFileWork: true,
                     calendar: calendar)
             },
             progress: progress)

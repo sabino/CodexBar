@@ -171,6 +171,10 @@ enum CostUsageScanner {
         /// Optional wall-clock budget for newly-read Codex bytes in one refresh. The reader
         /// finishes its current 256 KiB chunk, persists resume state, and continues later.
         var maxCodexScanDurationPerRefresh: TimeInterval?
+        /// Give explicit, user-driven catch-up passes a fresh bounded parsing window after
+        /// discovery work. Automatic maintenance leaves this disabled so its wall-clock cap
+        /// continues to cover the entire pass.
+        var renewCodexScanDurationBeforeFileWork = false
         /// Prefer newest session files first so recent usage lands before catch-up work.
         var preferNewestCodexSessionsFirst: Bool = true
         var codexScanWorkRecorderForTesting: CodexScanWorkRecorder?
@@ -214,9 +218,11 @@ enum CostUsageScanner {
         private(set) var deferredByBudgetFileCount = 0
         private(set) var deferredByTimeBudgetFileCount = 0
         private var bytesReserved: Int64 = 0
-        private let deadline: ContinuousClock.Instant?
+        private var deadline: ContinuousClock.Instant?
+        private let maxDuration: TimeInterval?
         private let now: @Sendable () -> ContinuousClock.Instant
         private var recordedTimeDeferral = false
+        private var requiresInitialFileWork = false
 
         init(
             maxFileBytes: Int64,
@@ -228,8 +234,10 @@ enum CostUsageScanner {
             self.maxBytesPerRefresh = max(0, maxBytesPerRefresh)
             self.now = now
             if let maxDuration, maxDuration > 0 {
+                self.maxDuration = maxDuration
                 self.deadline = now().advanced(by: .seconds(maxDuration))
             } else {
+                self.maxDuration = nil
                 self.deadline = nil
             }
         }
@@ -262,6 +270,9 @@ enum CostUsageScanner {
                 self.resumedPartialFileCount += 1
             }
             self.bytesReserved += allowance
+            if allowance > 0 {
+                self.requiresInitialFileWork = false
+            }
             return .allow(allowance)
         }
 
@@ -294,7 +305,25 @@ enum CostUsageScanner {
         }
 
         func shouldStopBeforeNextFile() -> Bool {
-            self.shouldYield(additionalBytes: 1)
+            if self.requiresInitialFileWork,
+               self.bytesConsumed == 0,
+               self.bytesReserved == 0
+            {
+                return false
+            }
+            return self.shouldYield(additionalBytes: 1)
+        }
+
+        /// Discovery and dependency bookkeeping can occasionally consume the full duration
+        /// before a byte is parsed. Manual catch-up uses this seam to guarantee one more
+        /// bounded parsing window; byte limits and cancellation remain unchanged.
+        func renewDurationBeforeFileWorkIfIdle() {
+            guard self.bytesConsumed == 0,
+                  self.bytesReserved == 0,
+                  let maxDuration
+            else { return }
+            self.deadline = self.now().advanced(by: .seconds(maxDuration))
+            self.requiresInitialFileWork = true
         }
     }
 
@@ -5548,6 +5577,9 @@ enum CostUsageScanner {
                 resources: resources,
                 checkCancellation: checkCancellation,
                 scanBudget: scanBudget)
+            if options.renewCodexScanDurationBeforeFileWork {
+                scanBudget.renewDurationBeforeFileWorkIfIdle()
+            }
             let scanResult = try Self.scanCodexFiles(
                 filesScheduledForRefresh,
                 context: scanContext,

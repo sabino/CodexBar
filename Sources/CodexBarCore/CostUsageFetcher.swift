@@ -320,6 +320,7 @@ public struct CostUsageFetcher: Sendable {
         codexHomePath: String? = nil,
         historyDays: Int = 30,
         maximumScanDurationPerRefresh: TimeInterval? = nil,
+        renewScanDurationBeforeFileWork: Bool = false,
         calendar: Calendar? = nil) async throws -> CodexScanCatchUpStatus
     {
         var options = Self.resolvedScannerOptions(
@@ -330,6 +331,7 @@ public struct CostUsageFetcher: Sendable {
         options.refreshMinIntervalSeconds = 0
         options.maxCodexScanDurationPerRefresh = maximumScanDurationPerRefresh
             ?? Self.codexAutomaticScanDurationPerRefresh
+        options.renewCodexScanDurationBeforeFileWork = renewScanDurationBeforeFileWork
         let clampedHistoryDays = max(1, min(365, historyDays))
         let since = options.calendar.date(
             byAdding: .day,

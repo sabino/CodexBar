@@ -3,6 +3,32 @@ import Testing
 @testable import CodexBarCore
 
 struct CodexHistoricalRefreshLinuxTests {
+    @Test
+    func `manual file work renews an expired idle scanner window`() {
+        let clock = CodexHistoricalRefreshTestClock()
+        let budget = CostUsageScanner.CodexScanBudget(
+            maxFileBytes: 100,
+            maxBytesPerRefresh: 150,
+            maxDuration: 2,
+            now: { clock.now() })
+
+        clock.advance(by: .seconds(3))
+        #expect(budget.shouldStopBeforeNextFile())
+
+        budget.renewDurationBeforeFileWorkIfIdle()
+        #expect(!budget.shouldStopBeforeNextFile())
+
+        clock.advance(by: .seconds(3))
+        #expect(!budget.shouldStopBeforeNextFile())
+        guard case let .allow(work) = budget.admit(workBytes: 100) else {
+            Issue.record("expected renewed file work to be admitted")
+            return
+        }
+        budget.consume(workBytes: work)
+
+        #expect(budget.shouldStopBeforeNextFile())
+    }
+
     private actor RefreshScript {
         var snapshotLoads = 0
         var statusLoads = 0
@@ -80,5 +106,23 @@ struct CodexHistoricalRefreshLinuxTests {
                 loadStatus: { pending },
                 advance: { pending })
         }
+    }
+}
+
+private final class CodexHistoricalRefreshTestClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private let origin = ContinuousClock.now
+    private var offset = Duration.zero
+
+    func now() -> ContinuousClock.Instant {
+        self.lock.lock()
+        defer { self.lock.unlock() }
+        return self.origin.advanced(by: self.offset)
+    }
+
+    func advance(by duration: Duration) {
+        self.lock.lock()
+        self.offset += duration
+        self.lock.unlock()
     }
 }

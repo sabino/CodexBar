@@ -1,4 +1,3 @@
-import CoreFoundation
 import Foundation
 
 public enum ProviderPluginEngineKind: Equatable, Sendable {
@@ -125,7 +124,7 @@ final class JSONProviderPluginValue: ProviderPluginValue {
 
     var isNumber: Bool {
         guard let number = self.value as? NSNumber else { return false }
-        return CFGetTypeID(number) != CFBooleanGetTypeID()
+        return !FoundationNumberBridge.isBoolean(number)
     }
 
     var isDate: Bool {

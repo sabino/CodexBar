@@ -1241,6 +1241,34 @@ struct CostUsagePerformanceGateTests {
         #expect(budget.shouldYield(additionalBytes: 0))
         #expect(budget.deferredByTimeBudgetFileCount == 1)
     }
+
+    @Test
+    func `codex scan budget can renew an idle file work window after discovery`() {
+        let clock = TestMonotonicClock()
+        let budget = CostUsageScanner.CodexScanBudget(
+            maxFileBytes: 100,
+            maxBytesPerRefresh: 150,
+            maxDuration: 2,
+            now: { clock.now() })
+
+        clock.advance(by: .seconds(3))
+        #expect(budget.shouldStopBeforeNextFile())
+
+        budget.renewDurationBeforeFileWorkIfIdle()
+        #expect(!budget.shouldStopBeforeNextFile())
+
+        // Cached-file validation can itself outlive the renewed window. A manual pass must
+        // still reach one actual parser admission instead of timing out at the next file.
+        clock.advance(by: .seconds(3))
+        #expect(!budget.shouldStopBeforeNextFile())
+        guard case let .allow(work) = budget.admit(workBytes: 100) else {
+            Issue.record("expected renewed file work to be admitted")
+            return
+        }
+        budget.consume(workBytes: work)
+
+        #expect(budget.shouldStopBeforeNextFile())
+    }
 }
 
 private final class TestMonotonicClock: @unchecked Sendable {

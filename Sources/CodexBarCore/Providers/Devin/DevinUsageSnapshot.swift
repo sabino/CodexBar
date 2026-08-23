@@ -1,4 +1,3 @@
-import CoreFoundation
 import Foundation
 
 public enum DevinUsageError: LocalizedError, Sendable {
@@ -306,7 +305,7 @@ public enum DevinUsageParser {
     private static func double(_ value: Any?) -> Double? {
         switch value {
         case let number as NSNumber:
-            CFGetTypeID(number) == CFBooleanGetTypeID() ? nil : number.doubleValue
+            FoundationNumberBridge.isBoolean(number) ? nil : number.doubleValue
         case let string as String:
             Double(string.trimmingCharacters(in: .whitespacesAndNewlines))
         default:
