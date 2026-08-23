@@ -209,7 +209,7 @@ struct CostUsageAggregateSnapshotLinuxTests {
             .appendingPathComponent("CodexBar-UpstreamCacheAdoption-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let predecessorHash = "2d17f4981b78d07f"
+        let predecessorHash = "99848ef16ca7e069"
         #expect(CostUsageStore.compatiblePredecessorParserHashes.contains(predecessorHash))
         let predecessorVersion = CostUsageStore.combinedSchemaVersion(
             base: CostUsageStore.baseSchemaVersion,
