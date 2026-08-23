@@ -1,0 +1,4 @@
+module CGIO [system] {
+    header "shim.h"
+    export *
+}

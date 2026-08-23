@@ -13,21 +13,30 @@ import WinUIBackend
 
 @main
 struct CodexBarCrossApp: App {
+    private let model: CodexBarCrossModel
+
     init() {
         #if os(Linux)
-        // This UI is almost entirely text and simple vector shapes. GTK's Cairo
-        // renderer avoids loading and warming a full GPU shader stack, which is
-        // a large resident-memory cost for an always-on tray utility.
-        if getenv("GSK_RENDERER") == nil {
+        let preferences = CodexBarCrossPreferencesStore().load()
+        if preferences.rendererMode == "Low-memory software", getenv("GSK_RENDERER") == nil {
             setenv("GSK_RENDERER", "cairo", 0)
         }
         #endif
+        self.model = CodexBarCrossModel()
     }
 
     var body: some Scene {
-        WindowGroup("CodexBar") {
-            CodexBarRootView()
+        Window("CodexBar", id: "mini") {
+            CodexBarMiniView(model: self.model)
         }
+        .defaultLaunchBehavior(.presented)
+        .defaultSize(width: 420, height: 720)
+        .windowResizability(.contentMinSize)
+
+        Window("CodexBar Settings", id: "settings") {
+            CodexBarRootView(model: self.model)
+        }
+        .defaultLaunchBehavior(.suppressed)
         .defaultSize(width: 980, height: 680)
         .windowResizability(.contentMinSize)
     }

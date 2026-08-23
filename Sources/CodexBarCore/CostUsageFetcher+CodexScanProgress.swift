@@ -24,6 +24,9 @@ extension CostUsageFetcher {
             completedFiles: progress.metadata.completedFiles
                 ?? max(0, progress.fileCount - progress.incompleteFileCount),
             totalFiles: progress.metadata.totalFiles ?? progress.fileCount,
+            incompleteFiles: progress.incompleteFileCount,
+            bufferedLines: progress.bufferedLineCount,
+            revalidationActive: progress.lookbackState?.cacheWideMigrationQueueActive == true,
             staleSnapshotUpdatedAt: pending ? previousUpdatedAt : nil)
     }
 

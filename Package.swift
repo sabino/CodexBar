@@ -91,6 +91,31 @@ let package = Package(
                     .apt(["libsqlite3-dev"]),
                     .brew(["sqlite3"]),
                 ]),
+            .systemLibrary(
+                name: "CGIO",
+                pkgConfig: "gio-2.0",
+                providers: [
+                    .apt(["libglib2.0-dev"]),
+                    .brew(["glib"]),
+                ]),
+            .systemLibrary(
+                name: "CGdkX11",
+                pkgConfig: "gtk4",
+                providers: [
+                    .apt(["libgtk-4-dev"]),
+                    .brew(["gtk4"]),
+                ]),
+            .target(
+                name: "CPlatformTray",
+                dependencies: [
+                    .target(name: "CGIO", condition: .when(platforms: [.linux])),
+                ],
+                path: "Sources/CPlatformTray",
+                publicHeadersPath: "include",
+                linkerSettings: [
+                    .linkedLibrary("shell32", .when(platforms: [.windows])),
+                    .linkedLibrary("user32", .when(platforms: [.windows])),
+                ]),
             .target(
                 name: "CodexBarCore",
                 dependencies: [
@@ -131,8 +156,10 @@ let package = Package(
             .executableTarget(
                 name: "CodexBarCross",
                 dependencies: [
+                    "CPlatformTray",
                     "CodexBarCore",
                     "CodexBarCrossSupport",
+                    .target(name: "CGdkX11", condition: .when(platforms: [.linux])),
                     .product(name: "SwiftCrossUI", package: "swift-cross-ui"),
                 ] + codexBarCrossBackendDependencies,
                 path: "Sources/CodexBarCross",

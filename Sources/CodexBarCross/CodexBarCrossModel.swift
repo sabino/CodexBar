@@ -73,6 +73,7 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
         var error: String?
         var historyProgressText: String?
         var historyProgressFraction: Double?
+        var historyCatchUpStatus: CostUsageFetcher.CodexScanCatchUpStatus?
     }
 
     @SwiftCrossUI.Published private var providerPresentation: ProviderPresentation
@@ -199,6 +200,10 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
             spend: 0)
     }
 
+    var providerContentRevision: UInt64 {
+        self.providerRevision
+    }
+
     func authenticationSummary(for provider: UsageProvider) -> ProviderDiagnosticAuthSummary {
         let summary = self.providerRuntime.authenticationSummary(provider: provider, config: self.config)
         let fetchedSuccessfully = self.providers.first(where: { $0.id == provider }).map {
@@ -212,13 +217,20 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
         self.spendDashboard.groups.first
     }
 
-    var indexedSpendCoverageText: String? {
+    var indexedSpendCoverageSummary: CodexBarCrossHistoryCoverageSummary? {
         guard let snapshot = self.costSnapshot,
               !snapshot.historyCoverageIsEstablished,
               !snapshot.daily.isEmpty
         else { return nil }
-        let count = snapshot.daily.count
-        return "Showing \(count) indexed \(count == 1 ? "day" : "days") while historical catch-up is incomplete"
+        let sortedDays = snapshot.daily.map(\.date).sorted()
+        let status = self.spendPresentation.historyCatchUpStatus
+        return CodexBarCrossHistoryCoverageSummary(
+            indexedDayCount: sortedDays.count,
+            firstDay: sortedDays.first,
+            lastDay: sortedDays.last,
+            incompleteFileCount: status?.incompleteFiles ?? 0,
+            bufferedLineCount: status?.bufferedLines ?? 0,
+            revalidationActive: status?.revalidationActive ?? false)
     }
 
     func select(_ section: Section) {
@@ -360,9 +372,11 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
         let snapshot = await self.costFetcher.loadCachedCodexTokenSnapshot(
             historyDays: SpendRange.year.rawValue,
             includeProjectAndSessionBreakdowns: false)
+        let catchUpStatus = await self.costFetcher.codexScanCatchUpStatus()
         var presentation = self.spendPresentation
         if let snapshot {
             Self.applySpendSnapshot(snapshot, to: &presentation)
+            presentation.historyCatchUpStatus = catchUpStatus
         } else {
             presentation.error = "No indexed spend history is available yet."
         }
@@ -484,8 +498,12 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
                 includePiSessions: true,
                 includeProjectAndSessionBreakdowns: false,
                 bypassScannerDebounce: true)
+            let catchUpStatus = await self.costFetcher.codexScanCatchUpStatus()
             if self.costSnapshot != nil || self.section == .spend {
-                self.publishSpendSnapshot(snapshot)
+                var presentation = self.spendPresentation
+                Self.applySpendSnapshot(snapshot, to: &presentation)
+                presentation.historyCatchUpStatus = catchUpStatus
+                self.publishSpendPresentation(presentation)
             }
         } catch {
             // Automatic maintenance is best-effort. Existing indexed history stays
@@ -525,7 +543,11 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
             fraction = nil
             text = status.pending ? "Indexing historical sessions…" : "Historical usage is current."
         }
-        self.setHistoryProgress(text: text, fraction: fraction)
+        var presentation = self.spendPresentation
+        presentation.historyCatchUpStatus = status
+        presentation.historyProgressText = text
+        presentation.historyProgressFraction = fraction
+        self.publishSpendPresentation(presentation)
     }
 
     private func setSpendError(_ error: String?) {

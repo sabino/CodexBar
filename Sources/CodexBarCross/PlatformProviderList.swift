@@ -12,6 +12,7 @@ struct PlatformProviderListItem: Identifiable, Equatable {
     let id: UsageProvider
     let title: String
     let symbol: String
+    let iconPath: String?
     let state: State
 }
 
@@ -115,13 +116,22 @@ struct PlatformProviderList: GtkWidgetRepresentable {
             row.marginStart = 8
             row.marginEnd = 8
 
-            let symbol = Gtk.Label(string: item.symbol)
-            symbol.widthChars = 2
-            symbol.xalign = 0.5
-            symbol.css.set(properties: [
-                CSSProperty(key: "color", value: "rgba(196, 201, 214, 0.82)"),
-                .fontSize(12),
-            ], clear: true)
+            let artwork: Gtk.Widget
+            if let iconPath = item.iconPath {
+                let icon = Gtk.Image(filename: iconPath)
+                icon.pixelSize = 18
+                icon.setSizeRequest(width: 20, height: 20)
+                artwork = icon
+            } else {
+                let symbol = Gtk.Label(string: item.symbol)
+                symbol.widthChars = 2
+                symbol.xalign = 0.5
+                symbol.css.set(properties: [
+                    CSSProperty(key: "color", value: "rgba(196, 201, 214, 0.82)"),
+                    .fontSize(12),
+                ], clear: true)
+                artwork = symbol
+            }
 
             let title = Gtk.Label(string: item.title)
             title.expandHorizontally = true
@@ -140,7 +150,7 @@ struct PlatformProviderList: GtkWidgetRepresentable {
                 .fontSize(10),
             ], clear: true)
 
-            row.add(symbol)
+            row.add(artwork)
             row.add(title)
             row.add(status)
 
@@ -195,7 +205,8 @@ struct PlatformProviderList: View {
         ScrollView {
             List(self.items(), selection: self.selection) { item in
                 HStack(spacing: 8) {
-                    Text(item.symbol)
+                    ProviderArtwork(provider: item.id, fallback: item.symbol)
+                        .frame(width: 18, height: 18)
                     Text(item.title)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     Circle()

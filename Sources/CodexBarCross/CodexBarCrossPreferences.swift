@@ -33,6 +33,7 @@ struct CodexBarCrossPreferences: Codable, Equatable {
 
     var historyEnabled = true
     var historyWindow = "1 year"
+    var rendererMode = "Automatic"
     var diagnosticsEnabled = false
     var verboseProviderErrors = false
 
@@ -57,8 +58,18 @@ struct CodexBarCrossPreferencesStore {
     }
 
     func load() -> CodexBarCrossPreferences {
-        guard let data = self.defaults.data(forKey: Self.storageKey),
-              let preferences = try? JSONDecoder().decode(CodexBarCrossPreferences.self, from: data)
+        guard let data = self.defaults.data(forKey: Self.storageKey) else {
+            return CodexBarCrossPreferences()
+        }
+        if let preferences = try? JSONDecoder().decode(CodexBarCrossPreferences.self, from: data) {
+            return preferences
+        }
+        guard var payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return CodexBarCrossPreferences()
+        }
+        payload["rendererMode"] = payload["rendererMode"] ?? "Automatic"
+        guard let migrated = try? JSONSerialization.data(withJSONObject: payload),
+              let preferences = try? JSONDecoder().decode(CodexBarCrossPreferences.self, from: migrated)
         else {
             return CodexBarCrossPreferences()
         }

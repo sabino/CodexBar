@@ -3,15 +3,18 @@ import Foundation
 import SwiftCrossUI
 #if os(Linux)
 import GtkBackend
+#elseif os(macOS)
+import AppKitBackend
+#elseif os(Windows)
+import WinUIBackend
 #endif
 
 struct CodexBarRootView: View {
-    @State private var modelHolder = ModelHolder()
-    @Environment(\.dismissWindow) private var dismissWindow
+    @State private var model: CodexBarCrossModel
     @Environment(\.openURL) private var openURL
 
-    private var model: CodexBarCrossModel {
-        self.modelHolder.model
+    init(model: CodexBarCrossModel) {
+        self._model = State(wrappedValue: model)
     }
 
     var body: some View {
@@ -48,10 +51,19 @@ struct CodexBarRootView: View {
         .toggleStyle(.switch)
         #if os(Linux)
             .inspectWindow { window in
+                PlatformWindowController.shared.attachSettingsWindow(window)
                 LinuxWindowResizeCoalescer.install(on: window)
-                window.setEscapeKeyPressedHandler { [weak window] in
-                    window?.close()
+                window.setEscapeKeyPressedHandler {
+                    PlatformWindowController.shared.hideSettings()
                 }
+            }
+        #elseif os(macOS)
+            .inspectWindow { window in
+                PlatformWindowController.shared.attachSettingsWindow(window)
+            }
+        #elseif os(Windows)
+            .inspectWindow { window in
+                PlatformWindowController.shared.attachSettingsWindow(window)
             }
         #endif
             .task {
@@ -70,7 +82,7 @@ struct CodexBarRootView: View {
                     .fontWeight(.bold)
                 Spacer()
                 Button {
-                    self.dismissWindow()
+                    PlatformWindowController.shared.hideSettings()
                 } label: {
                     Text("×")
                         .font(.title2)
@@ -147,6 +159,7 @@ struct CodexBarRootView: View {
                 id: provider.id,
                 title: provider.name,
                 symbol: self.providerGlyph(provider.id),
+                iconPath: ProviderIconStore.url(for: provider.id)?.path,
                 state: self.providerListState(provider))
         }
     }
@@ -313,18 +326,18 @@ struct CodexBarRootView: View {
                 }
             }
 
-            if let coverage = self.model.indexedSpendCoverageText {
+            if let coverage = self.model.indexedSpendCoverageSummary {
                 self.card {
                     HStack(spacing: 10) {
                         Text("◔")
                             .foregroundColor(CodexBarPalette.accent)
                         VStack(spacing: 3) {
-                            Text("PARTIAL INDEX")
+                            Text(coverage.title)
                                 .font(.caption)
                                 .fontWeight(.bold)
                                 .foregroundColor(CodexBarPalette.accent)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                            Text("\(coverage) · Refresh runs a complete historical pass.")
+                            Text("\(coverage.message) Refresh runs a complete historical pass.")
                                 .font(.caption)
                                 .foregroundColor(CodexBarPalette.secondaryText)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -435,7 +448,9 @@ struct CodexBarRootView: View {
                 if let group = self.model.primarySpendGroup, !group.providers.isEmpty {
                     ForEach(group.providers) { row in
                         HStack(spacing: 10) {
-                            Text(self.providerGlyph(row.provider))
+                            ProviderArtwork(
+                                provider: row.provider,
+                                fallback: self.providerGlyph(row.provider))
                                 .frame(width: 20, height: 20)
                             VStack(spacing: 2) {
                                 Text(row.displayName)
@@ -663,6 +678,14 @@ struct CodexBarRootView: View {
             self.sectionLabel("DIAGNOSTICS")
             self.card {
                 VStack(spacing: 14) {
+                    #if os(Linux)
+                    self.settingPickerRow(
+                        title: "UI renderer",
+                        subtitle: "Automatic uses GPU acceleration when GTK supports it. Changes apply after restart.",
+                        options: ["Automatic", "Low-memory software"],
+                        keyPath: \.rendererMode)
+                    Divider()
+                    #endif
                     self.settingToggleRow(
                         title: "Diagnostic details",
                         subtitle: "Expose non-secret provider routing and cache status in the UI.",
@@ -716,7 +739,7 @@ struct CodexBarRootView: View {
                             if let url = URL(string: "https://github.com/steipete/CodexBar") { self.openURL(url) }
                         }
                         Spacer()
-                        Button("Close") { self.dismissWindow() }
+                        Button("Close") { PlatformWindowController.shared.hideSettings() }
                     }
                 }
             }
@@ -730,9 +753,11 @@ extension CodexBarRootView {
         let authentication = self.model.authenticationSummary(for: provider.id)
         return VStack(spacing: 18) {
             HStack(spacing: 12) {
-                Text(self.providerGlyph(provider.id))
-                    .font(.title)
-                    .frame(width: 44, height: 44, alignment: .center)
+                ProviderArtwork(
+                    provider: provider.id,
+                    fallback: self.providerGlyph(provider.id))
+                    .frame(width: 24, height: 24, alignment: .center)
+                    .padding(10)
                     .background(self.providerAccent(provider).opacity(0.16))
                     .cornerRadius(12)
                 VStack(spacing: 3) {
@@ -1092,12 +1117,7 @@ extension CodexBarRootView {
     }
 }
 
-@MainActor
-private struct ModelHolder {
-    let model = CodexBarCrossModel()
-}
-
-private struct ModelObservedRegion<Content: View>: View {
+struct ModelObservedRegion<Content: View>: View {
     @State private var model: CodexBarCrossModel
     private let content: () -> Content
 
@@ -1165,7 +1185,7 @@ private enum ContentCacheKey: Hashable {
     case provider
 }
 
-private enum CodexBarPalette {
+enum CodexBarPalette {
     static let windowGradient = [
         Color(red: 0.105, green: 0.11, blue: 0.135),
         Color(red: 0.055, green: 0.065, blue: 0.085),

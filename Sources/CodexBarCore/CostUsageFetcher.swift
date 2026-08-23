@@ -49,6 +49,9 @@ public struct CostUsageFetcher: Sendable {
         package let totalBytes: Int64
         package let completedFiles: Int
         package let totalFiles: Int
+        package let incompleteFiles: Int
+        package let bufferedLines: Int
+        package let revalidationActive: Bool
         package let staleSnapshotUpdatedAt: Date?
 
         package init(
@@ -58,6 +61,9 @@ public struct CostUsageFetcher: Sendable {
             totalBytes: Int64 = 0,
             completedFiles: Int = 0,
             totalFiles: Int = 0,
+            incompleteFiles: Int = 0,
+            bufferedLines: Int = 0,
+            revalidationActive: Bool = false,
             staleSnapshotUpdatedAt: Date? = nil)
         {
             self.pending = pending
@@ -66,6 +72,9 @@ public struct CostUsageFetcher: Sendable {
             self.totalBytes = max(0, totalBytes)
             self.completedFiles = max(0, completedFiles)
             self.totalFiles = max(0, totalFiles)
+            self.incompleteFiles = max(0, incompleteFiles)
+            self.bufferedLines = max(0, bufferedLines)
+            self.revalidationActive = revalidationActive
             self.staleSnapshotUpdatedAt = staleSnapshotUpdatedAt
         }
     }
