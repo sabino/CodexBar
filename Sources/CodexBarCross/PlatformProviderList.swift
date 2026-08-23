@@ -1,3 +1,5 @@
+#if CrossPlatformApp
+
 import CodexBarCore
 import SwiftCrossUI
 
@@ -226,5 +228,7 @@ struct PlatformProviderList: View {
         }
     }
 }
+
+#endif
 
 #endif

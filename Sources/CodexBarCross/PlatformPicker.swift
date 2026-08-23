@@ -1,3 +1,5 @@
+#if CrossPlatformApp
+
 import SwiftCrossUI
 
 #if os(Linux)
@@ -89,3 +91,5 @@ extension Collection {
         self.indices.contains(index) ? self[index] : nil
     }
 }
+
+#endif

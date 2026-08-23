@@ -92,8 +92,8 @@ jobs:
         run: |
           set -euo pipefail
           swift --version
-          swift build -c release --product CodexBarCross
-          bin_dir="$(swift build -c release --product CodexBarCross --show-bin-path)"
+          swift build -c release --traits CrossPlatformApp --product CodexBarCross
+          bin_dir="$(swift build -c release --traits CrossPlatformApp --product CodexBarCross --show-bin-path)"
           echo "bin_dir=$bin_dir" >> "$GITHUB_OUTPUT"
           file "$bin_dir/CodexBarCross"
 
@@ -187,8 +187,8 @@ jobs:
         id: build
         run: |
           set -euo pipefail
-          swift build -c release --product CodexBarCross --arch "${{ matrix.architecture }}"
-          bin_dir="$(swift build -c release --product CodexBarCross \
+          swift build -c release --traits CrossPlatformApp --product CodexBarCross --arch "${{ matrix.architecture }}"
+          bin_dir="$(swift build -c release --traits CrossPlatformApp --product CodexBarCross \
             --arch "${{ matrix.architecture }}" --show-bin-path)"
           lipo -archs "$bin_dir/CodexBarCross" | tr ' ' '\n' | grep -Fx "${{ matrix.architecture }}"
           echo "bin_dir=$bin_dir" >> "$GITHUB_OUTPUT"
@@ -292,8 +292,8 @@ jobs:
         id: build
         run: |
           swift --version
-          swift build -c release --product CodexBarCross -j 2
-          $binDirectory = swift build -c release --product CodexBarCross --show-bin-path
+          swift build -c release --traits CrossPlatformApp --product CodexBarCross -j 2
+          $binDirectory = swift build -c release --traits CrossPlatformApp --product CodexBarCross --show-bin-path
           if (-not (Test-Path (Join-Path $binDirectory "CodexBarCross.exe"))) {
               throw "CodexBarCross.exe was not produced in $binDirectory"
           }

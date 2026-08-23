@@ -83,29 +83,31 @@ Windows.
 
 ## Build from source
 
-Use Swift 6.2.1 or newer. The dependency graph is pinned by `Package.resolved`.
+Use Swift 6.2.1 or newer. The dependency graph is pinned by `Package.resolved`. The `CrossPlatformApp` package trait
+enables only the native renderer graph; leaving it off keeps the original `CodexBarCLI` and `CodexBarCore` builds free
+of GTK, AppKitBackend, and WinUI build dependencies.
 
 ### Linux
 
 ```bash
 sudo apt install clang libglib2.0-dev libgtk-4-dev libsqlite3-dev pkg-config
-swift build --product CodexBarCross
+swift build --traits CrossPlatformApp --product CodexBarCross
 .build/debug/CodexBarCross
 ```
 
 For the release layout used by GitHub Actions:
 
 ```bash
-swift build -c release --product CodexBarCross
-bin_dir="$(swift build -c release --product CodexBarCross --show-bin-path)"
+swift build -c release --traits CrossPlatformApp --product CodexBarCross
+bin_dir="$(swift build -c release --traits CrossPlatformApp --product CodexBarCross --show-bin-path)"
 ./Scripts/package_cross_platform_app.sh linux 0.0.0-dev x86_64 "$bin_dir" /tmp/codexbar-assets
 ```
 
 ### macOS
 
 ```bash
-swift build -c release --product CodexBarCross --arch arm64
-bin_dir="$(swift build -c release --product CodexBarCross --arch arm64 --show-bin-path)"
+swift build -c release --traits CrossPlatformApp --product CodexBarCross --arch arm64
+bin_dir="$(swift build -c release --traits CrossPlatformApp --product CodexBarCross --arch arm64 --show-bin-path)"
 ./Scripts/package_cross_platform_app.sh macos 0.0.0-dev arm64 "$bin_dir" /tmp/codexbar-assets
 ```
 
@@ -115,8 +117,8 @@ Build from a Visual Studio developer shell with Swift 6.2.1, SQLite from vcpkg, 
 
 ```powershell
 vcpkg install sqlite3:x64-windows
-swift build -c release --product CodexBarCross -j 2
-$bin = swift build -c release --product CodexBarCross --show-bin-path
+swift build -c release --traits CrossPlatformApp --product CodexBarCross -j 2
+$bin = swift build -c release --traits CrossPlatformApp --product CodexBarCross --show-bin-path
 ./Scripts/package_cross_platform_windows.ps1 `
     -Version 0.0.0-dev -Architecture x86_64 -BinDirectory $bin -OutputDirectory $env:TEMP
 ```

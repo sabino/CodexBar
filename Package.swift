@@ -20,16 +20,28 @@ let sqlite3LinkerSettings: [LinkerSetting] = if let sqlite3LibDir, !sqlite3LibDi
 
 #if os(Linux)
 let codexBarCrossBackendDependencies: [Target.Dependency] = [
-    .product(name: "GtkBackend", package: "swift-cross-ui"),
-    .product(name: "Gtk", package: "swift-cross-ui"),
+    .product(
+        name: "GtkBackend",
+        package: "swift-cross-ui",
+        condition: .when(traits: ["CrossPlatformApp"])),
+    .product(
+        name: "Gtk",
+        package: "swift-cross-ui",
+        condition: .when(traits: ["CrossPlatformApp"])),
 ]
 #elseif os(macOS)
 let codexBarCrossBackendDependencies: [Target.Dependency] = [
-    .product(name: "AppKitBackend", package: "swift-cross-ui"),
+    .product(
+        name: "AppKitBackend",
+        package: "swift-cross-ui",
+        condition: .when(traits: ["CrossPlatformApp"])),
 ]
 #elseif os(Windows)
 let codexBarCrossBackendDependencies: [Target.Dependency] = [
-    .product(name: "WinUIBackend", package: "swift-cross-ui"),
+    .product(
+        name: "WinUIBackend",
+        package: "swift-cross-ui",
+        condition: .when(traits: ["CrossPlatformApp"])),
 ]
 #else
 #error("CodexBarCross supports Linux, macOS, and Windows")
@@ -61,6 +73,11 @@ let package = Package(
 
         return products
     }(),
+    traits: [
+        // Keep the original CLI/core build graph free of renderer dependencies. Enable this
+        // trait when building the native SwiftCrossUI desktop product.
+        "CrossPlatformApp",
+    ],
     dependencies: [
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.9.3"),
         .package(url: "https://github.com/steipete/Commander", from: "0.2.1"),
@@ -156,11 +173,16 @@ let package = Package(
             .executableTarget(
                 name: "CodexBarCross",
                 dependencies: [
-                    "CPlatformTray",
-                    "CodexBarCore",
-                    "CodexBarCrossSupport",
-                    .target(name: "CGdkX11", condition: .when(platforms: [.linux])),
-                    .product(name: "SwiftCrossUI", package: "swift-cross-ui"),
+                    .target(name: "CPlatformTray", condition: .when(traits: ["CrossPlatformApp"])),
+                    .target(name: "CodexBarCore", condition: .when(traits: ["CrossPlatformApp"])),
+                    .target(name: "CodexBarCrossSupport", condition: .when(traits: ["CrossPlatformApp"])),
+                    .target(
+                        name: "CGdkX11",
+                        condition: .when(platforms: [.linux], traits: ["CrossPlatformApp"])),
+                    .product(
+                        name: "SwiftCrossUI",
+                        package: "swift-cross-ui",
+                        condition: .when(traits: ["CrossPlatformApp"])),
                 ] + codexBarCrossBackendDependencies,
                 path: "Sources/CodexBarCross",
                 swiftSettings: [

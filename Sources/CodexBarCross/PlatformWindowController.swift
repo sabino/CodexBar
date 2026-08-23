@@ -1,3 +1,5 @@
+#if CrossPlatformApp
+
 #if os(Linux)
 import CGdkX11
 import CGtk
@@ -136,4 +138,6 @@ private final class HidingWindowDelegate: NSObject, NSWindowDelegate {
         return false
     }
 }
+#endif
+
 #endif

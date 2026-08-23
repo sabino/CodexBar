@@ -30,7 +30,7 @@ Never push fork branches, cross-platform tags, release artifacts, appcast change
 ```bash
 swift --version
 swift package resolve
-swift build --product CodexBarCross
+swift build --traits CrossPlatformApp --product CodexBarCross
 make check
 make test
 ```

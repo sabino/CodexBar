@@ -18,7 +18,8 @@ read_when:
 - Windows: Swift 6.2.1, Visual Studio 2022 with the Windows SDK, vcpkg `sqlite3:x64-windows`, and Windows App Runtime
   `1.5.240205001-preview1` for launching the WinUI build.
 
-Start with `swift build --product CodexBarCross`. The complete commands and release layouts are in
+Start with `swift build --traits CrossPlatformApp --product CodexBarCross`. The trait keeps renderer dependencies out
+of CLI-only builds. The complete commands and release layouts are in
 [Cross-platform desktop app](CROSS_PLATFORM.md). The signing and Keychain guidance below applies to the original
 macOS app.
 
@@ -109,7 +110,7 @@ The build script creates `CodexBar.app` in the project root. Old numbered builds
 For the cross-platform app:
 
 ```bash
-swift run CodexBarCross
+swift run --traits CrossPlatformApp CodexBarCross
 ```
 
 For the original macOS app:

@@ -16,8 +16,8 @@ read_when:
 Cross-platform desktop app:
 
 ```bash
-swift build --product CodexBarCross
-swift run CodexBarCross
+swift build --traits CrossPlatformApp --product CodexBarCross
+swift run --traits CrossPlatformApp CodexBarCross
 ```
 
 The original macOS app:
@@ -40,7 +40,8 @@ The original macOS app:
 
 1. **Make shared provider changes** in `Sources/CodexBarCore/`, original macOS UI changes in `Sources/CodexBar/`, and
    portable UI changes in `Sources/CodexBarCross/`.
-2. **Run** `swift run CodexBarCross` for the shared desktop UI, or `./Scripts/compile_and_run.sh --test` for the
+2. **Run** `swift run --traits CrossPlatformApp CodexBarCross` for the shared desktop UI, or
+   `./Scripts/compile_and_run.sh --test` for the
    original macOS bundle.
 3. **Check logs** in Console.app (filter by "codexbar")
 4. **Optional file log**: enable Debug → Logging → "Enable file logging" to write
@@ -160,8 +161,8 @@ swiftlint --strict
 
 ```bash
 # Linux example
-swift build -c release --product CodexBarCross
-bin_dir="$(swift build -c release --product CodexBarCross --show-bin-path)"
+swift build -c release --traits CrossPlatformApp --product CodexBarCross
+bin_dir="$(swift build -c release --traits CrossPlatformApp --product CodexBarCross --show-bin-path)"
 ./Scripts/package_cross_platform_app.sh linux 0.0.0-dev x86_64 "$bin_dir" /tmp/codexbar-assets
 ```
 

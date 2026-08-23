@@ -1,3 +1,5 @@
+#if CrossPlatformApp
+
 import CPlatformTray
 import Foundation
 
@@ -71,4 +73,6 @@ private let codexbarTrayActivated: @convention(c) (UnsafeMutableRawPointer?) -> 
         PlatformWindowController.shared.toggleMini()
     }
 }
+#endif
+
 #endif

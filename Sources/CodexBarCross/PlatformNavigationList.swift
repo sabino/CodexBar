@@ -1,3 +1,5 @@
+#if CrossPlatformApp
+
 import CodexBarCrossSupport
 import SwiftCrossUI
 
@@ -193,5 +195,7 @@ struct PlatformNavigationList: View {
         }
     }
 }
+
+#endif
 
 #endif

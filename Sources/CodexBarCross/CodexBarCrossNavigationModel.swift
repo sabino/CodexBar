@@ -1,3 +1,5 @@
+#if CrossPlatformApp
+
 import CodexBarCore
 import CodexBarCrossSupport
 import SwiftCrossUI
@@ -57,3 +59,5 @@ final class CodexBarCrossNavigationModel: SwiftCrossUI.ObservableObject {
         }
     }
 }
+
+#endif

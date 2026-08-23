@@ -1,3 +1,5 @@
+#if CrossPlatformApp
+
 import CodexBarCore
 import Foundation
 import SwiftCrossUI
@@ -460,3 +462,5 @@ private struct MiniUsageLane: Identifiable {
     let label: String
     let window: RateWindow
 }
+
+#endif

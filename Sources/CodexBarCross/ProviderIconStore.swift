@@ -1,3 +1,5 @@
+#if CrossPlatformApp
+
 import CodexBarCore
 import Foundation
 import SwiftCrossUI
@@ -47,3 +49,5 @@ struct ProviderArtwork: View {
         }
     }
 }
+
+#endif

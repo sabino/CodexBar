@@ -1,3 +1,5 @@
+#if CrossPlatformApp
+
 #if os(Linux)
 import CGtk
 import CodexBarCrossSupport
@@ -145,4 +147,6 @@ private let resizeQuietPeriodExpired: GtkSourceCallback = { data in
     context.quietPeriodExpired()
     return 0
 }
+#endif
+
 #endif

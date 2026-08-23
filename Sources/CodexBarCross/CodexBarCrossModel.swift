@@ -1,3 +1,5 @@
+#if CrossPlatformApp
+
 import CodexBarCore
 import CodexBarCrossSupport
 import Foundation
@@ -596,3 +598,5 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
         providers[index].error = error
     }
 }
+
+#endif

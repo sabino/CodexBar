@@ -241,15 +241,15 @@ The shared desktop build requires Swift 6.2.1+ and the platform's native develop
 
 ```bash
 # Linux: install clang, GTK 4/GLib, SQLite, and pkg-config first
-swift build --product CodexBarCross
+swift build --traits CrossPlatformApp --product CodexBarCross
 .build/debug/CodexBarCross
 
 # macOS
-swift build --product CodexBarCross
-swift run CodexBarCross
+swift build --traits CrossPlatformApp --product CodexBarCross
+swift run --traits CrossPlatformApp CodexBarCross
 
 # Windows, from a Visual Studio developer shell after installing sqlite3:x64-windows
-swift build --product CodexBarCross
+swift build --traits CrossPlatformApp --product CodexBarCross
 ```
 
 See [docs/CROSS_PLATFORM.md](docs/CROSS_PLATFORM.md) for exact dependencies and release packaging commands.

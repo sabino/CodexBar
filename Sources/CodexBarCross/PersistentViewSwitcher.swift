@@ -1,3 +1,5 @@
+#if CrossPlatformApp
+
 @_spi(Backends) import SwiftCrossUI
 
 /// Keeps previously visited conditional view branches alive instead of rebuilding their
@@ -216,3 +218,5 @@ private final class PersistentViewSwitcherChildren<Selection: Hashable, Revision
         self.pendingSelection = selection
     }
 }
+
+#endif

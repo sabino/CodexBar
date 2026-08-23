@@ -1,3 +1,5 @@
+#if CrossPlatformApp
+
 import CodexBarCore
 import Foundation
 import SwiftCrossUI
@@ -1203,3 +1205,5 @@ enum CodexBarPalette {
     static let ready = Color(red: 0.43, green: 0.69, blue: 0.91)
     static let attention = Color(red: 0.92, green: 0.42, blue: 0.42)
 }
+
+#endif

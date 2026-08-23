@@ -16,8 +16,8 @@ in the shared `CodexBarCore`; the fork does not maintain a Rust or Electron impl
 
 ```bash
 # Native cross-platform desktop app
-swift build --product CodexBarCross
-swift run CodexBarCross
+swift build --traits CrossPlatformApp --product CodexBarCross
+swift run --traits CrossPlatformApp CodexBarCross
 
 # Original macOS bundle
 ./Scripts/compile_and_run.sh --test

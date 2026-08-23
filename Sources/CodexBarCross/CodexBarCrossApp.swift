@@ -1,3 +1,5 @@
+#if CrossPlatformApp
+
 import SwiftCrossUI
 
 #if os(Linux)
@@ -41,3 +43,5 @@ struct CodexBarCrossApp: App {
         .windowResizability(.contentMinSize)
     }
 }
+
+#endif
