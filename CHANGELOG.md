@@ -7,7 +7,7 @@
 - Distribution: build, smoke-test, checksum, and publish native SwiftCrossUI desktop archives for Linux x86_64,
   macOS arm64/x86_64, and Windows x86_64 from the fork's GitHub Actions workflow.
 - Build: isolate the optional native renderer graph behind SwiftPM's `CrossPlatformApp` trait so original CLI/core
-  builds do not require GTK, AppKitBackend, or WinUI development dependencies.
+  builds do not require GTK, GLib/GIO, AppKitBackend, or WinUI development dependencies.
 - Cross-platform history: guarantee an explicit full historical refresh receives a fresh bounded parsing window after
   discovery, so large archives keep advancing instead of exhausting the time budget before reading session bytes;
   adopt the preceding scheduling-only cache generation without rebuilding its compatible indexed rows.

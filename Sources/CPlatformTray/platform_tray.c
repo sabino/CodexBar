@@ -1,6 +1,6 @@
 #include "CPlatformTray.h"
 
-#if defined(__linux__)
+#if defined(__linux__) && defined(CODEXBAR_CROSS_PLATFORM_APP)
 
 #include <gio/gio.h>
 #include <glib.h>

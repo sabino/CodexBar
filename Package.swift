@@ -129,6 +129,11 @@ let package = Package(
                 ],
                 path: "Sources/CPlatformTray",
                 publicHeadersPath: "include",
+                cSettings: [
+                    .define(
+                        "CODEXBAR_CROSS_PLATFORM_APP",
+                        .when(traits: ["CrossPlatformApp"])),
+                ],
                 linkerSettings: [
                     .linkedLibrary("shell32", .when(platforms: [.windows])),
                     .linkedLibrary("user32", .when(platforms: [.windows])),
