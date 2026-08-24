@@ -815,6 +815,11 @@ extension CostUsageScanner {
             // metadata-identical file can remain aggregate-only; hydrate only when a duplicate
             // session encountered in this pass needs row-level reconciliation or when pricing
             // metadata must actually be rebuilt.
+            // Aggregates without persisted row identities are not proof of canonicalization.
+            // Match the hydrated path by forcing those legacy/rowless entries through a rescan.
+            if cached.codexLazyStorageState?.storedHasRows == false, !cached.days.isEmpty {
+                return false
+            }
             guard !sessionAlreadyContributed,
                   cached.sessionId.map({ !context.resources.duplicateSessionIDs.contains($0) }) ?? true,
                   !Self.needsCodexPricingMetadata(cached, range: context.range)

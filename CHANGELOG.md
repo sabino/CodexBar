@@ -11,6 +11,8 @@
 - Cross-platform history: guarantee an explicit full historical refresh receives a fresh bounded parsing window after
   discovery, so large archives keep advancing instead of exhausting the time budget before reading session bytes;
   adopt the preceding scheduling-only cache generation without rebuilding its compatible indexed rows.
+- Cross-platform history: keep upstream's duplicate-session safety for rowless legacy cache entries by rescanning them
+  instead of treating aggregate-only lazy state as proof of canonical row identity.
 - Windows: add a narrow host compatibility layer around native `Foundation.Process`, Win32 termination, secure atomic
   credential publishing, bounded directory paging, and `FileManager` session metadata; also gate Darwin-only trust
   APIs and isolate a Swift 6.2 optimizer assertion to one JSONL scan function so the shared provider and history engines
