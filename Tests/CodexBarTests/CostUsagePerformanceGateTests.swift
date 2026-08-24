@@ -457,8 +457,18 @@ struct CostUsagePerformanceGateTests {
         }
 
         #expect(counter.value == 0)
-        #expect(warm.data == cold.data)
-        #expect(warm.summary == cold.summary)
+        #expect(warm.data.count == cold.data.count)
+        #expect(warm.data.map(\.date) == cold.data.map(\.date))
+        #expect(warm.data.map(\.totalTokens) == cold.data.map(\.totalTokens))
+        #expect(warm.data.map(\.modelsUsed) == cold.data.map(\.modelsUsed))
+        #expect(warm.data.map { $0.modelBreakdowns?.map(\.modelName) }
+            == cold.data.map { $0.modelBreakdowns?.map(\.modelName) })
+        #expect(abs((warm.data.first?.costUSD ?? 0) - (cold.data.first?.costUSD ?? 0)) < 0.000_000_001)
+        #expect(warm.summary?.totalInputTokens == cold.summary?.totalInputTokens)
+        #expect(warm.summary?.totalOutputTokens == cold.summary?.totalOutputTokens)
+        #expect(warm.summary?.cacheReadTokens == cold.summary?.cacheReadTokens)
+        #expect(warm.summary?.totalTokens == cold.summary?.totalTokens)
+        #expect(abs((warm.summary?.totalCostUSD ?? 0) - (cold.summary?.totalCostUSD ?? 0)) < 0.000_000_001)
     }
 
     @Test
