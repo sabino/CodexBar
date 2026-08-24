@@ -7,7 +7,6 @@ struct CodexBarCrossPreferences: Codable, Equatable {
 
     var refreshInterval = "5 minutes"
     var refreshOnOpen = true
-    var lowPowerMode = "Automatic"
     var statusChecksEnabled = true
 
     var depletedNotifications = true
@@ -33,6 +32,7 @@ struct CodexBarCrossPreferences: Codable, Equatable {
 
     var historyEnabled = true
     var historyWindow = "1 year"
+    var surfaceStyle = "Automatic"
     var rendererMode = "Automatic"
     var diagnosticsEnabled = false
     var verboseProviderErrors = false
@@ -44,6 +44,19 @@ struct CodexBarCrossPreferences: Codable, Equatable {
         case "90 days": 90
         case "6 months": 180
         default: 365
+        }
+    }
+
+    var usesSolidSurfaces: Bool {
+        switch self.surfaceStyle {
+        case "Solid": true
+        case "Layered": false
+        default:
+            #if os(macOS)
+            false
+            #else
+            true
+            #endif
         }
     }
 }
@@ -67,6 +80,7 @@ struct CodexBarCrossPreferencesStore {
         guard var payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return CodexBarCrossPreferences()
         }
+        payload["surfaceStyle"] = payload["surfaceStyle"] ?? "Automatic"
         payload["rendererMode"] = payload["rendererMode"] ?? "Automatic"
         guard let migrated = try? JSONSerialization.data(withJSONObject: payload),
               let preferences = try? JSONDecoder().decode(CodexBarCrossPreferences.self, from: migrated)

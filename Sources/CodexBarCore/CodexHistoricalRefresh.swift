@@ -7,14 +7,14 @@ package enum CodexHistoricalRefreshError: LocalizedError, Equatable, Sendable {
     package var errorDescription: String? {
         switch self {
         case .noProgress:
-            "Historical refresh stopped because a bounded scanner pass made no progress."
+            "Historical refresh stopped because a scanner pass made no progress."
         case .coverageNotEstablished:
             "Historical refresh finished without establishing complete history coverage."
         }
     }
 }
 
-/// Drives the original bounded Codex scanner until it has established complete coverage.
+/// Drives the original Codex scanner until it has established complete coverage.
 ///
 /// A stable snapshot load can discover a file that changed while catch-up was finishing. The
 /// outer loop intentionally verifies scanner status after every stable load and resumes catch-up
@@ -67,10 +67,6 @@ package enum CodexHistoricalRefreshCoordinator {
 }
 
 extension CostUsageFetcher {
-    /// Manual Refresh may consume a core continuously, but still checkpoints often
-    /// enough to keep cancellation responsive and publish meaningful UI progress.
-    private static let codexManualScanDurationPerRefresh: TimeInterval = 8
-
     package func refreshCodexHistoryToCompletion(
         environment: [String: String] = ProcessInfo.processInfo.environment,
         codexHomePath: String? = nil,
@@ -110,8 +106,7 @@ extension CostUsageFetcher {
                     now: Date(),
                     codexHomePath: codexHomePath,
                     historyDays: historyDays,
-                    maximumScanDurationPerRefresh: Self.codexManualScanDurationPerRefresh,
-                    renewScanDurationBeforeFileWork: true,
+                    unboundedWork: true,
                     calendar: calendar)
             },
             progress: progress)

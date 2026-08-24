@@ -33,7 +33,8 @@ the host operating system supports them.
 - **Plan around resets.** Per-provider session, weekly, and monthly windows with countdowns to the next reset — stop guessing whether to start that long task.
 - **Credits, spend, and cost scans.** Credit balances, Admin API spend dashboards, provider billing summaries, and local cost scans where the source exposes enough detail.
 - **Live status.** Provider status polling surfaces incident badges in the menu and an indicator overlay on the bar icon.
-- **Privacy-first.** Reuses existing provider sessions — OAuth, device flow, API keys, browser cookies, local files — so no passwords are stored.
+- **Privacy-first.** Reuses existing provider sessions — OAuth, device flow, API keys, browser cookies, and known
+  provider files — without recursively crawling disks or discovering mounts; no passwords are stored.
 
 ## Install
 

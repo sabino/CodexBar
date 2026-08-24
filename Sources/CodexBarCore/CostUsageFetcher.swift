@@ -320,6 +320,7 @@ public struct CostUsageFetcher: Sendable {
         now: Date = Date(),
         codexHomePath: String? = nil,
         historyDays: Int = 30,
+        unboundedWork: Bool = false,
         maximumScanDurationPerRefresh: TimeInterval? = nil,
         renewScanDurationBeforeFileWork: Bool = false,
         calendar: Calendar? = nil) async throws -> CodexScanCatchUpStatus
@@ -330,9 +331,11 @@ public struct CostUsageFetcher: Sendable {
             codexHomePath: codexHomePath)
         options.forceRescan = false
         options.refreshMinIntervalSeconds = 0
-        options.maxCodexScanDurationPerRefresh = maximumScanDurationPerRefresh
-            ?? Self.codexAutomaticScanDurationPerRefresh
-        options.renewCodexScanDurationBeforeFileWork = renewScanDurationBeforeFileWork
+        Self.configureCodexCatchUpWorkLimits(
+            &options,
+            unboundedWork: unboundedWork,
+            maximumScanDurationPerRefresh: maximumScanDurationPerRefresh,
+            renewScanDurationBeforeFileWork: renewScanDurationBeforeFileWork)
         let clampedHistoryDays = max(1, min(365, historyDays))
         let since = options.calendar.date(
             byAdding: .day,
@@ -350,6 +353,24 @@ public struct CostUsageFetcher: Sendable {
                 checkCancellation: checkCancellation)
             try checkCancellation()
             return Self.codexScanCatchUpStatus(options: scanOptions)
+        }
+    }
+
+    static func configureCodexCatchUpWorkLimits(
+        _ options: inout CostUsageScanner.Options,
+        unboundedWork: Bool,
+        maximumScanDurationPerRefresh: TimeInterval?,
+        renewScanDurationBeforeFileWork: Bool)
+    {
+        if unboundedWork {
+            options.maxCodexSessionFileBytes = 0
+            options.maxCodexScanBytesPerRefresh = 0
+            options.maxCodexScanDurationPerRefresh = nil
+            options.renewCodexScanDurationBeforeFileWork = false
+        } else {
+            options.maxCodexScanDurationPerRefresh = maximumScanDurationPerRefresh
+                ?? self.codexAutomaticScanDurationPerRefresh
+            options.renewCodexScanDurationBeforeFileWork = renewScanDurationBeforeFileWork
         }
     }
 

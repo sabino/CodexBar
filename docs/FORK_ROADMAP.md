@@ -13,15 +13,19 @@ read_when:
 - One SwiftCrossUI view tree builds on Linux, macOS, and Windows.
 - The compact provider window, full settings window, searchable provider sidebar, Usage & Spend dashboard, native tray,
   provider artwork, resizable panes, and native controls are implemented.
-- Historical usage uses the original incremental scanner and SQLite store. Automatic work is bounded and cached;
-  explicit Refresh completes a full historical pass.
+- Historical usage uses the original incremental scanner and SQLite store. Automatic work is incremental and cached;
+  explicit Refresh removes scanner debounce, duration, byte, and candidate limits and completes a full historical
+  pass without an inter-pass delay. Terminal malformed or missing-lineage records remain explicitly partial and do
+  not trigger cyclic rescans.
+- Native window allocation, navigation, and controls are delivered without a portable UI throttle; Linux uses an
+  opaque surface by default and lets GTK select GPU acceleration automatically.
 - The original SwiftUI/AppKit macOS app and CLI remain in-tree and continue to receive upstream changes.
 
 ## Near-term priorities
 
 1. Keep `upstream/main` mergeable and avoid copying provider logic into the UI target.
-2. Expand renderer-neutral tests for navigation, controls, tray commands, resize delivery, history coverage, and cache
-   loading before adding platform-specific workarounds.
+2. Expand renderer-neutral tests for navigation, controls, tray commands, history coverage, and cache loading before
+   adding platform-specific workarounds.
 3. Validate every released build on real Linux and macOS hosts in addition to CI smoke tests; restore Windows release
    artifacts only after the WinUI build is fast and stable enough to gate tags.
 4. Close portable authentication gaps only through narrow adapters; never show account data from another provider.

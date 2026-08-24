@@ -13,10 +13,15 @@ import WinUI
 @MainActor
 final class PlatformWindowController {
     static let shared = PlatformWindowController()
+    private var settingsOpener: (@MainActor () -> Void)?
+
+    func registerSettingsOpener(_ opener: @escaping @MainActor () -> Void) {
+        self.settingsOpener = opener
+    }
 
     #if os(Linux)
-    private weak var miniWindow: Gtk.ApplicationWindow?
-    private weak var settingsWindow: Gtk.ApplicationWindow?
+    private var miniWindow: Gtk.ApplicationWindow?
+    private var settingsWindow: Gtk.ApplicationWindow?
 
     func attachMiniWindow(_ window: Gtk.ApplicationWindow) {
         self.miniWindow = window
@@ -28,7 +33,13 @@ final class PlatformWindowController {
 
     func attachSettingsWindow(_ window: Gtk.ApplicationWindow) {
         self.settingsWindow = window
-        Self.enableHideOnClose(window)
+        window.onDestroy = { [weak self, weak window] _ in
+            Task { @MainActor in
+                guard let self, self.settingsWindow === window else { return }
+                self.settingsWindow = nil
+                PlatformMemory.releaseUnusedHeapPages()
+            }
+        }
     }
 
     func showMini() {
@@ -49,7 +60,26 @@ final class PlatformWindowController {
     }
 
     func hideSettings() {
-        self.settingsWindow?.hide()
+        guard let settingsWindow = self.settingsWindow else { return }
+        self.settingsWindow = nil
+        settingsWindow.close()
+        PlatformMemory.releaseUnusedHeapPages()
+    }
+
+    func showSettings() {
+        if let settingsWindow {
+            settingsWindow.present()
+        } else {
+            self.settingsOpener?()
+        }
+    }
+
+    func terminateApplication() {
+        guard let window = self.miniWindow ?? self.settingsWindow else { return }
+        let pointer = UnsafeMutableRawPointer(window.widgetPointer)
+            .assumingMemoryBound(to: GtkWindow.self)
+        guard let application = gtk_window_get_application(pointer) else { return }
+        g_application_quit(UnsafeMutableRawPointer(application).assumingMemoryBound(to: GApplication.self))
     }
 
     private static func enableHideOnClose(_ window: Gtk.ApplicationWindow) {
@@ -96,6 +126,19 @@ final class PlatformWindowController {
         self.settingsWindow?.orderOut(nil)
     }
 
+    func showSettings() {
+        guard let settingsWindow else {
+            self.settingsOpener?()
+            return
+        }
+        settingsWindow.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func terminateApplication() {
+        NSApp.terminate(nil)
+    }
+
     #elseif os(Windows)
     private var miniWindow: WinUI.Window?
     private var settingsWindow: WinUI.Window?
@@ -126,6 +169,19 @@ final class PlatformWindowController {
 
     func hideSettings() {
         try? self.settingsWindow?.appWindow.hide()
+    }
+
+    func showSettings() {
+        guard let settingsWindow else {
+            self.settingsOpener?()
+            return
+        }
+        try? settingsWindow.appWindow.show(true)
+    }
+
+    func terminateApplication() {
+        try? self.miniWindow?.close()
+        try? self.settingsWindow?.close()
     }
     #endif
 }

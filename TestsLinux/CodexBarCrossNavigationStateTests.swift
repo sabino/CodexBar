@@ -4,44 +4,6 @@ import Testing
 
 struct CodexBarCrossNavigationStateTests {
     @Test
-    func `resize delivery keeps only the latest value in a burst`() {
-        var state = CodexBarCrossLatestValueDeliveryState<Int>()
-
-        let schedulesFirstDelivery = state.receive(900)
-        let schedulesSecondDelivery = state.receive(980)
-        let schedulesThirdDelivery = state.receive(1120)
-        #expect(schedulesFirstDelivery)
-        #expect(!schedulesSecondDelivery)
-        #expect(!schedulesThirdDelivery)
-        #expect(state.consumeLatest() == 1120)
-        let redeliversAfterBurst = state.finishDeliveryWindow()
-        #expect(!redeliversAfterBurst)
-        #expect(state.consumeLatest() == nil)
-    }
-
-    @Test
-    func `resize delivery retains changes that arrive during cooldown`() {
-        var state = CodexBarCrossLatestValueDeliveryState<Int>()
-
-        let schedulesFirstDelivery = state.receive(900)
-        #expect(schedulesFirstDelivery)
-        #expect(state.consumeLatest() == 900)
-        let schedulesDuringCooldown = state.receive(980)
-        #expect(!schedulesDuringCooldown)
-        let redeliversAfterChange = state.finishDeliveryWindow()
-        #expect(redeliversAfterChange)
-        #expect(state.consumeLatest() == 980)
-        let redeliversAfterCatchUp = state.finishDeliveryWindow()
-        #expect(!redeliversAfterCatchUp)
-
-        let schedulesDuplicateDelivery = state.receive(980)
-        #expect(schedulesDuplicateDelivery)
-        #expect(state.consumeLatest() == nil)
-        let redeliversDuplicate = state.finishDeliveryWindow()
-        #expect(!redeliversDuplicate)
-    }
-
-    @Test
     func `cached history opens without immediate maintenance`() {
         #expect(!CodexBarCrossHistoryLoadingPolicy.shouldRunImmediateMaintenance(
             cachedSnapshotLoaded: true,

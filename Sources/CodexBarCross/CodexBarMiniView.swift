@@ -41,9 +41,13 @@ struct CodexBarMiniView: View {
                 self.footer
             }
         }
-        .frame(minWidth: 390, minHeight: 500)
+        .frame(
+            minWidth: 390,
+            maxWidth: .infinity,
+            minHeight: 500,
+            maxHeight: .infinity)
         .background(LinearGradient(
-            colors: CodexBarPalette.windowGradient,
+            colors: CodexBarPalette.windowGradient(solid: self.usesSolidSurfaces),
             startPoint: .topLeading,
             endPoint: .bottomTrailing))
         .foregroundColor(CodexBarPalette.primaryText)
@@ -51,7 +55,6 @@ struct CodexBarMiniView: View {
         #if os(Linux)
             .inspectWindow { window in
                 PlatformWindowController.shared.attachMiniWindow(window)
-                LinuxWindowResizeCoalescer.install(on: window)
                 window.setEscapeKeyPressedHandler {
                     PlatformWindowController.shared.hideMini()
                 }
@@ -72,6 +75,10 @@ struct CodexBarMiniView: View {
                     self.updateTray()
                 }
                 .task {
+                    let openWindow = self.openWindow
+                    PlatformWindowController.shared.registerSettingsOpener {
+                        openWindow(id: "settings")
+                    }
                     self.model.startAutomaticHistoryMaintenance()
                     await self.model.refresh(self.selectedProviderID, interaction: .background)
                 }
@@ -83,14 +90,6 @@ struct CodexBarMiniView: View {
                 .font(.headline)
                 .fontWeight(.bold)
             Spacer()
-            Button {
-                Task { await self.model.refresh(self.selectedProviderID) }
-            } label: {
-                Text(self.model.isRefreshing ? "…" : "↻")
-                    .font(.headline)
-                    .frame(width: 30, height: 28)
-            }
-            .buttonStyle(.plain)
             Button {
                 PlatformWindowController.shared.hideMini()
                 self.openWindow(id: "settings")
@@ -110,7 +109,7 @@ struct CodexBarMiniView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(CodexBarPalette.sidebarBackground)
+        .background(self.sidebarBackground)
     }
 
     private var providerSwitcher: some View {
@@ -155,7 +154,7 @@ struct CodexBarMiniView: View {
             .padding(.vertical, 8)
         }
         .frame(height: 76)
-        .background(CodexBarPalette.sidebarBackground.opacity(0.72))
+        .background(self.sidebarBackground)
     }
 
     @ViewBuilder
@@ -183,6 +182,9 @@ struct CodexBarMiniView: View {
                     if let cost = snapshot.providerCost {
                         self.costCard(cost)
                     }
+                    ForEach(Array(snapshot.details.enumerated()), id: \.offset) { _, section in
+                        self.providerDetailSection(section)
+                    }
                 } else {
                     self.emptyUsageCard(provider)
                 }
@@ -202,6 +204,7 @@ struct CodexBarMiniView: View {
                         }
                     }
                 }
+                self.providerActions(provider)
             }
         } else {
             Text("No providers are enabled.")
@@ -211,32 +214,29 @@ struct CodexBarMiniView: View {
     }
 
     private var footer: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 0) {
             Divider()
-            HStack(spacing: 10) {
-                Button("Usage & Spend") {
-                    self.model.select(.spend)
-                    PlatformWindowController.shared.hideMini()
-                    self.openWindow(id: "settings")
-                }
-                if let dashboardURL = self.selectedDashboardURL {
-                    Button("Dashboard") {
-                        self.openURL(dashboardURL)
-                    }
-                }
-                Spacer()
-                Button("Hide") {
-                    PlatformWindowController.shared.hideMini()
-                }
+            self.actionRow("Refresh") {
+                Task { await self.model.refresh(self.selectedProviderID) }
             }
+            self.actionRow("About CodexBar") {
+                self.model.select(.about)
+                PlatformWindowController.shared.hideMini()
+                self.openWindow(id: "settings")
+            }
+            self.actionRow("Quit") {
+                PlatformWindowController.shared.terminateApplication()
+            }
+            Divider()
             Text(self.updatedText)
                 .font(.caption)
                 .foregroundColor(CodexBarPalette.tertiaryText)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 9)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(CodexBarPalette.sidebarBackground.opacity(0.78))
+        .background(self.sidebarBackground)
     }
 
     private var switcherProviders: [CodexBarCrossModel.ProviderRow] {
@@ -253,6 +253,12 @@ struct CodexBarMiniView: View {
         guard let selectedProvider else { return nil }
         let descriptor = ProviderDescriptorRegistry.descriptor(for: selectedProvider.id)
         return descriptor.metadata.dashboardURL.flatMap(URL.init(string:))
+    }
+
+    private var selectedStatusURL: URL? {
+        guard let selectedProvider else { return nil }
+        let metadata = ProviderDescriptorRegistry.descriptor(for: selectedProvider.id).metadata
+        return (metadata.statusLinkURL ?? metadata.statusPageURL).flatMap(URL.init(string:))
     }
 
     private var updatedText: String {
@@ -314,19 +320,36 @@ struct CodexBarMiniView: View {
         let metadata = ProviderDescriptorRegistry.descriptor(for: provider.id).metadata
         var lanes: [MiniUsageLane] = []
         if let primary = snapshot.primary, !primary.isSyntheticPlaceholder {
-            lanes.append(MiniUsageLane(id: "primary", label: metadata.sessionLabel, window: primary))
+            lanes.append(MiniUsageLane(
+                id: "primary",
+                label: metadata.sessionLabel,
+                window: primary,
+                provider: provider.id,
+                paceSlot: .primary))
         }
         if let secondary = snapshot.secondary {
-            lanes.append(MiniUsageLane(id: "secondary", label: metadata.weeklyLabel, window: secondary))
+            lanes.append(MiniUsageLane(
+                id: "secondary",
+                label: metadata.weeklyLabel,
+                window: secondary,
+                provider: provider.id,
+                paceSlot: .secondary))
         }
         if let tertiary = snapshot.tertiary {
             lanes.append(MiniUsageLane(
                 id: "tertiary",
                 label: metadata.opusLabel ?? "Additional quota",
-                window: tertiary))
+                window: tertiary,
+                provider: provider.id,
+                paceSlot: .tertiary))
         }
         for extra in snapshot.extraRateWindows ?? [] where extra.usageKnown {
-            lanes.append(MiniUsageLane(id: extra.id, label: extra.title, window: extra.window))
+            lanes.append(MiniUsageLane(
+                id: extra.id,
+                label: extra.title,
+                window: extra.window,
+                provider: provider.id,
+                paceSlot: nil))
         }
         return lanes
     }
@@ -346,8 +369,113 @@ struct CodexBarMiniView: View {
                     .font(.caption)
                     .foregroundColor(CodexBarPalette.secondaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                if let pace = self.paceSummary(for: lane) {
+                    Text(pace)
+                        .font(.caption)
+                        .foregroundColor(CodexBarPalette.secondaryText)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
         }
+    }
+
+    private func paceSummary(for lane: MiniUsageLane, now: Date = Date()) -> String? {
+        guard let slot = lane.paceSlot else { return nil }
+        let capability = ProviderDescriptorRegistry.descriptor(for: lane.provider).pace
+        let window = capability.resolvedResetWindowForPace(lane.window)
+        guard let kind = capability.resolvedKind(slot: slot, window: window, now: now),
+              window.remainingPercent > 0,
+              let pace = UsagePace.weekly(
+                  window: window,
+                  now: now,
+                  defaultWindowMinutes: kind.defaultWindowMinutes),
+              pace.expectedUsedPercent >= 3
+        else { return nil }
+
+        let delta = Int(abs(pace.deltaPercent).rounded())
+        let state = switch pace.stage {
+        case .onTrack: "On pace"
+        case .slightlyAhead, .ahead, .farAhead: "\(delta)% in deficit"
+        case .slightlyBehind, .behind, .farBehind: "\(delta)% in reserve"
+        }
+        let projection: String? = if pace.willLastToReset {
+            "Lasts until reset"
+        } else if let eta = pace.etaSeconds {
+            "Runs out " + UsageFormatter.resetCountdownDescription(
+                from: now.addingTimeInterval(eta),
+                now: now)
+        } else {
+            nil
+        }
+        return projection.map { "Pace: \(state) · \($0)" } ?? "Pace: \(state)"
+    }
+
+    private func providerDetailSection(_ section: ProviderDetailSection) -> some View {
+        self.card {
+            VStack(spacing: 8) {
+                if let title = section.title {
+                    Text(title)
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                ForEach(Array(section.rows.enumerated()), id: \.offset) { _, row in
+                    HStack(spacing: 12) {
+                        Text(row.label)
+                            .foregroundColor(CodexBarPalette.secondaryText)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        VStack(spacing: 2) {
+                            Text(row.value)
+                                .frame(maxWidth: .infinity, alignment: .trailing)
+                            if let secondary = row.secondaryValue {
+                                Text(secondary)
+                                    .font(.caption)
+                                    .foregroundColor(CodexBarPalette.tertiaryText)
+                                    .frame(maxWidth: .infinity, alignment: .trailing)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func providerActions(_ provider: CodexBarCrossModel.ProviderRow) -> some View {
+        VStack(spacing: 0) {
+            Divider()
+            self.actionRow("Provider Settings…") {
+                _ = self.model.select(provider.id)
+                PlatformWindowController.shared.hideMini()
+                self.openWindow(id: "settings")
+            }
+            if let dashboardURL = self.selectedDashboardURL {
+                self.actionRow("Usage Dashboard") {
+                    self.openURL(dashboardURL)
+                }
+            }
+            if let statusURL = self.selectedStatusURL {
+                self.actionRow("Status Page") {
+                    self.openURL(statusURL)
+                }
+            }
+            self.actionRow("Usage & Spend") {
+                self.model.select(.spend)
+                PlatformWindowController.shared.hideMini()
+                self.openWindow(id: "settings")
+            }
+        }
+    }
+
+    private func actionRow(
+        _ title: String,
+        action: @escaping @MainActor @Sendable () -> Void)
+        -> some View
+    {
+        Button(action: action) {
+            Text(title)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 7)
+        }
+        .buttonStyle(.plain)
     }
 
     private func emptyUsageCard(_ provider: CodexBarCrossModel.ProviderRow) -> some View {
@@ -393,7 +521,7 @@ struct CodexBarMiniView: View {
             .background {
                 ZStack {
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(CodexBarPalette.cardBackground)
+                        .fill(self.cardBackground)
                     RoundedRectangle(cornerRadius: 12)
                         .stroke(CodexBarPalette.cardBorder, style: StrokeStyle(width: 1))
                 }
@@ -407,6 +535,18 @@ struct CodexBarMiniView: View {
         case "Ready": CodexBarPalette.ready
         default: CodexBarPalette.tertiaryText
         }
+    }
+
+    private var usesSolidSurfaces: Bool {
+        self.model.preferences.usesSolidSurfaces
+    }
+
+    private var sidebarBackground: Color {
+        CodexBarPalette.sidebarBackground(solid: self.usesSolidSurfaces)
+    }
+
+    private var cardBackground: Color {
+        CodexBarPalette.cardBackground(solid: self.usesSolidSurfaces)
     }
 
     private func accent(_ provider: CodexBarCrossModel.ProviderRow) -> Color {
@@ -455,7 +595,8 @@ struct CodexBarMiniView: View {
         let quota = provider.remainingPercent.map { " · \(Int($0.rounded()))% left" } ?? ""
         PlatformTrayController.shared.installOrUpdate(
             state: state,
-            tooltip: "CodexBar · \(provider.name)\(quota)")
+            tooltip: "CodexBar · \(provider.name)\(quota)",
+            provider: provider.id)
     }
 }
 
@@ -463,6 +604,8 @@ private struct MiniUsageLane: Identifiable {
     let id: String
     let label: String
     let window: RateWindow
+    let provider: UsageProvider
+    let paceSlot: ProviderPaceSlot?
 }
 
 #endif

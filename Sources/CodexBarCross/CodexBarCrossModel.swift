@@ -54,12 +54,6 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
         }
     }
 
-    struct ContentRevision: Hashable {
-        let preferences: UInt64
-        let provider: UInt64
-        let spend: UInt64
-    }
-
     private struct ProviderPresentation {
         var providers: [ProviderRow]
         var isRefreshing = false
@@ -89,9 +83,7 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
     private let preferencesStore: CodexBarCrossPreferencesStore
     private var automaticHistoryMaintenanceTask: Task<Void, Never>?
     private var automaticHistoryMaintenanceStarted = false
-    private var preferencesRevision: UInt64 = 0
     private var providerRevision: UInt64 = 0
-    private var spendRevision: UInt64 = 0
     let navigationModel = CodexBarCrossNavigationModel()
 
     init(configStore: CodexBarConfigStore = CodexBarConfigStore()) {
@@ -183,25 +175,6 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
         return self.providers.first(where: { $0.id == selectedProviderID })
     }
 
-    var selectedContentRevision: ContentRevision {
-        if self.selectedProviderID != nil {
-            return ContentRevision(
-                preferences: self.preferencesRevision,
-                provider: self.providerRevision,
-                spend: 0)
-        }
-        if self.section == .spend {
-            return ContentRevision(
-                preferences: self.preferencesRevision,
-                provider: 0,
-                spend: self.spendRevision)
-        }
-        return ContentRevision(
-            preferences: self.preferencesRevision,
-            provider: 0,
-            spend: 0)
-    }
-
     var providerContentRevision: UInt64 {
         self.providerRevision
     }
@@ -220,23 +193,27 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
     }
 
     var indexedSpendCoverageSummary: CodexBarCrossHistoryCoverageSummary? {
-        guard let snapshot = self.costSnapshot,
-              !snapshot.historyCoverageIsEstablished,
-              !snapshot.daily.isEmpty
+        guard let snapshot = self.costSnapshot else { return nil }
+        let status = self.spendPresentation.historyCatchUpStatus
+        guard CodexBarCrossHistoryCoveragePolicy.shouldShow(
+            coverageEstablished: snapshot.historyCoverageIsEstablished,
+            indexedDayCount: snapshot.daily.count,
+            catchUpStatusAvailable: status != nil,
+            catchUpPending: status?.pending == true),
+            let status
         else { return nil }
         let sortedDays = snapshot.daily.map(\.date).sorted()
-        let status = self.spendPresentation.historyCatchUpStatus
         return CodexBarCrossHistoryCoverageSummary(
             indexedDayCount: sortedDays.count,
             firstDay: sortedDays.first,
             lastDay: sortedDays.last,
-            incompleteFileCount: status?.incompleteFiles ?? 0,
-            bufferedLineCount: status?.bufferedLines ?? 0,
-            revalidationActive: status?.revalidationActive ?? false)
+            incompleteFileCount: status.incompleteFiles,
+            bufferedLineCount: status.bufferedLines,
+            revalidationActive: status.revalidationActive && self.isRefreshingSpend)
     }
 
     func select(_ section: Section) {
-        _ = self.navigationModel.select(section)
+        guard self.navigationModel.select(section) else { return }
         if section == .spend, self.costSnapshot == nil, !self.isRefreshingSpend {
             Task {
                 let cachedSnapshotLoaded = await self.loadCachedSpendHistory()
@@ -341,7 +318,6 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
         var preferences = self.preferences
         guard preferences[keyPath: keyPath] != value else { return }
         preferences[keyPath: keyPath] = value
-        self.preferencesRevision &+= 1
         self.preferences = preferences
         self.preferencesStore.save(preferences)
         self.rescheduleAutomaticHistoryMaintenance()
@@ -425,15 +401,19 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
             presentation.isRefreshing = false
             self.publishSpendPresentation(presentation)
         } catch {
+            let catchUpStatus = await self.costFetcher.codexScanCatchUpStatus()
+            let refreshError = Self.historicalRefreshErrorMessage(error, status: catchUpStatus)
             var presentation = self.spendPresentation
-            presentation.error = error.localizedDescription
+            presentation.historyCatchUpStatus = catchUpStatus
+            presentation.error = refreshError
             if presentation.snapshot == nil {
                 if let cached = await self.costFetcher.loadCachedCodexTokenSnapshot(
                     historyDays: SpendRange.year.rawValue,
                     includeProjectAndSessionBreakdowns: false)
                 {
                     presentation = self.spendPresentation
-                    presentation.error = error.localizedDescription
+                    presentation.historyCatchUpStatus = catchUpStatus
+                    presentation.error = refreshError
                     Self.applySpendSnapshot(cached, to: &presentation)
                 }
             }
@@ -441,6 +421,18 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
             presentation.isRefreshing = false
             self.publishSpendPresentation(presentation)
         }
+    }
+
+    private static func historicalRefreshErrorMessage(
+        _ error: Error,
+        status: CostUsageFetcher.CodexScanCatchUpStatus) -> String
+    {
+        guard let historicalError = error as? CodexHistoricalRefreshError,
+              historicalError == .noProgress
+        else { return error.localizedDescription }
+        return CodexBarCrossHistoricalRefreshFailureSummary.noProgress(
+            incompleteFileCount: status.incompleteFiles,
+            bufferedLineCount: status.bufferedLines)
     }
 
     private func publishSpendSnapshot(_ snapshot: CostUsageTokenSnapshot) {
@@ -479,8 +471,7 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
         default: nil
         }
         guard let baseSeconds else { return nil }
-        let lowPowerMultiplier: UInt64 = self.preferences.lowPowerMode == "Always" ? 3 : 1
-        return baseSeconds * lowPowerMultiplier * 1_000_000_000
+        return baseSeconds * 1_000_000_000
     }
 
     private func performAutomaticHistoryMaintenanceSlice() async {
@@ -575,7 +566,6 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
     }
 
     private func publishSpendPresentation(_ presentation: SpendPresentation) {
-        self.spendRevision &+= 1
         self.spendPresentation = presentation
     }
 

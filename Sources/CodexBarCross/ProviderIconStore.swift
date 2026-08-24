@@ -19,9 +19,9 @@ enum ProviderIconStore {
 
         let directory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)
             .first?
-            .appendingPathComponent("CodexBar/provider-icons-v1", isDirectory: true)
+            .appendingPathComponent("CodexBar/provider-icons-v3", isDirectory: true)
             ?? FileManager.default.temporaryDirectory
-            .appendingPathComponent("CodexBar/provider-icons-v1", isDirectory: true)
+            .appendingPathComponent("CodexBar/provider-icons-v3", isDirectory: true)
         let url = directory.appendingPathComponent(resourceName).appendingPathExtension("png")
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

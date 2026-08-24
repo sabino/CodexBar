@@ -51,27 +51,40 @@ def renderer() -> str:
 
 
 def render_icon(executable: str, source: str) -> bytes:
-    try:
-        return render_normalized_icon(executable, source)
-    except subprocess.CalledProcessError:
-        pass
-
-    thumbnailer = shutil.which("gdk-pixbuf-thumbnailer")
-    if thumbnailer is not None:
-        with tempfile.NamedTemporaryFile(suffix=".png") as rasterized:
-            subprocess.run(
-                [thumbnailer, "-s", "64", source, rasterized.name],
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE,
-            )
-            return whiten_rasterized_icon(executable, rasterized.name)
-
     with open(source, "r", encoding="utf-8") as source_file:
         svg = source_file.read()
-    # ImageMagick's SVG path parser rejects adjacent fractional arc arguments
-    # accepted by browsers and AppKit (for example `a.215.215`). Preserve the
-    # canonical SVG and normalize only the temporary renderer input.
+    # AppKit and browsers resolve currentColor from the surrounding SwiftUI view.
+    # Standalone SVG rasterizers have no inherited CSS color and may silently emit a
+    # fully transparent PNG. Cross-platform artwork is monochrome at this stage, so
+    # resolve the canonical token to white before rasterizing and preserve its alpha.
+    svg = svg.replace("currentColor", "#ffffff")
+    # Some lightweight Linux SVG renderers fail closed on gradient references and
+    # emit transparent pixels. The embedded cross-platform set is monochrome by
+    # design, so retain the canonical geometry while resolving gradient fills.
+    svg = re.sub(r'fill="url\([^"]+\)"', 'fill="#ffffff"', svg)
+    # Render the resolved canonical SVG first. Rewriting every path damages valid
+    # long paths (the Codex mark is a concrete example), so syntax normalization is
+    # strictly a fallback for renderers that reject adjacent fractional arc values.
+    with tempfile.NamedTemporaryFile(suffix=".svg", mode="w", encoding="utf-8") as resolved:
+        resolved.write(svg)
+        resolved.flush()
+        try:
+            return render_svg_icon(executable, resolved.name)
+        except (subprocess.CalledProcessError, RuntimeError) as original_error:
+            thumbnailer = shutil.which("gdk-pixbuf-thumbnailer")
+            if thumbnailer is not None:
+                try:
+                    with tempfile.NamedTemporaryFile(suffix=".png") as rasterized:
+                        subprocess.run(
+                            [thumbnailer, "-s", "64", resolved.name, rasterized.name],
+                            check=True,
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.PIPE,
+                        )
+                        return whiten_rasterized_icon(executable, rasterized.name)
+                except (subprocess.CalledProcessError, RuntimeError):
+                    pass
+
     def normalize_path(match: re.Match[str]) -> str:
         path = match.group(1)
         path = re.sub(r"([A-Za-z])", r" \1 ", path)
@@ -79,14 +92,17 @@ def render_icon(executable: str, source: str) -> bytes:
         path = re.sub(r"(?<=\s)([01])([01])(?=\.)", r"\1 \2 ", path)
         return f'd="{path}"'
 
-    svg = re.sub(r'd="([^"]+)"', normalize_path, svg)
+    normalized_svg = re.sub(r'd="([^"]+)"', normalize_path, svg)
     with tempfile.NamedTemporaryFile(suffix=".svg", mode="w", encoding="utf-8") as normalized:
-        normalized.write(svg)
+        normalized.write(normalized_svg)
         normalized.flush()
-        return render_normalized_icon(executable, normalized.name)
+        try:
+            return render_svg_icon(executable, normalized.name)
+        except (subprocess.CalledProcessError, RuntimeError):
+            raise original_error
 
 
-def render_normalized_icon(executable: str, source: str) -> bytes:
+def render_svg_icon(executable: str, source: str) -> bytes:
     with tempfile.NamedTemporaryFile(suffix=".png") as temporary:
         command = [
             executable,
@@ -111,6 +127,7 @@ def render_normalized_icon(executable: str, source: str) -> bytes:
             f"PNG32:{temporary.name}",
         ]
         subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        ensure_visible_alpha(executable, temporary.name)
         temporary.seek(0)
         return remove_volatile_png_chunks(temporary.read())
 
@@ -136,8 +153,25 @@ def whiten_rasterized_icon(executable: str, source: str) -> bytes:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
         )
+        ensure_visible_alpha(executable, temporary.name)
         temporary.seek(0)
         return remove_volatile_png_chunks(temporary.read())
+
+
+def ensure_visible_alpha(executable: str, source: str) -> None:
+    result = subprocess.run(
+        [executable, source, "-format", "%[fx:mean.a]", "info:"],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        mean_alpha = float(result.stdout.strip())
+    except ValueError as error:
+        raise RuntimeError(f"could not inspect rendered alpha for {source}") from error
+    if mean_alpha <= 0:
+        raise RuntimeError(f"rendered icon is fully transparent: {source}")
 
 
 def main() -> None:
@@ -156,8 +190,9 @@ def main() -> None:
         name = os.path.splitext(os.path.basename(source))[0]
         try:
             rendered = render_icon(executable, source)
-        except subprocess.CalledProcessError as error:
-            detail = error.stderr.decode("utf-8", errors="replace") if error.stderr else ""
+        except (subprocess.CalledProcessError, RuntimeError) as error:
+            stderr = getattr(error, "stderr", None)
+            detail = stderr.decode("utf-8", errors="replace") if isinstance(stderr, bytes) else str(error)
             raise SystemExit(f"failed to render {source}: {detail}") from error
         encoded = base64.b64encode(rendered).decode("ascii")
         lines.append(f'        "{name}": "{encoded}",')

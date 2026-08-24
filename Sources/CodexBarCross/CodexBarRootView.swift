@@ -1,6 +1,7 @@
 #if CrossPlatformApp
 
 import CodexBarCore
+import CodexBarCrossSupport
 import Foundation
 import SwiftCrossUI
 #if os(Linux)
@@ -25,17 +26,12 @@ struct CodexBarRootView: View {
                 self.sidebar
             }
             .frame(minWidth: 228, idealWidth: 228, maxWidth: 228, maxHeight: .infinity)
-            .background(CodexBarPalette.sidebarBackground)
+            .background(self.sidebarBackground)
             Divider()
             ModelObservedRegion(model: self.model) {
                 ScrollView {
-                    PublishedObservedRegion(observation: self.model.navigationModel.routeObservation) {
-                        PersistentViewSwitcher(
-                            selection: self.contentCacheKey,
-                            revision: self.model.selectedContentRevision)
-                        {
-                            self.content
-                        }
+                    RouteObservedRegion(navigation: self.model.navigationModel) {
+                        self.content
                     }
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                     .padding(28)
@@ -43,18 +39,25 @@ struct CodexBarRootView: View {
             }
             .frame(minWidth: 620, maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(minWidth: 860, minHeight: 580)
-        .background(LinearGradient(
-            colors: CodexBarPalette.windowGradient,
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing))
+        .frame(
+            minWidth: 860,
+            maxWidth: .infinity,
+            minHeight: 580,
+            maxHeight: .infinity)
+        .background {
+            ModelObservedRegion(model: self.model) {
+                LinearGradient(
+                    colors: CodexBarPalette.windowGradient(solid: self.usesSolidSurfaces),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing)
+            }
+        }
         .foregroundColor(CodexBarPalette.primaryText)
         .colorScheme(.dark)
         .toggleStyle(.switch)
         #if os(Linux)
             .inspectWindow { window in
                 PlatformWindowController.shared.attachSettingsWindow(window)
-                LinuxWindowResizeCoalescer.install(on: window)
                 window.setEscapeKeyPressedHandler {
                     PlatformWindowController.shared.hideSettings()
                 }
@@ -187,14 +190,6 @@ struct CodexBarRootView: View {
             })
     }
 
-    private var contentCacheKey: ContentCacheKey {
-        if self.model.selectedProviderID != nil {
-            .provider
-        } else {
-            .section(self.model.section)
-        }
-    }
-
     @ViewBuilder
     private var content: some View {
         if let provider = self.model.selectedProvider {
@@ -261,12 +256,6 @@ struct CodexBarRootView: View {
                         subtitle: "Update the selected provider when the tray opens.",
                         keyPath: \.refreshOnOpen)
                     Divider()
-                    self.settingPickerRow(
-                        title: "Low power mode",
-                        subtitle: "Throttle automatic work while preserving manual refresh.",
-                        options: ["Automatic", "Always", "Never"],
-                        keyPath: \.lowPowerMode)
-                    Divider()
                     self.settingToggleRow(
                         title: "Provider status checks",
                         subtitle: "Include official status-page health when available.",
@@ -308,7 +297,7 @@ struct CodexBarRootView: View {
                             .padding(.horizontal, 13)
                             .padding(.vertical, 7)
                             .background(self.model.spendRange == range
-                                ? CodexBarPalette.selectionBackground
+                                ? self.selectionBackground
                                 : Color.clear)
                             .cornerRadius(7)
                     }
@@ -339,7 +328,7 @@ struct CodexBarRootView: View {
                                 .fontWeight(.bold)
                                 .foregroundColor(CodexBarPalette.accent)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                            Text("\(coverage.message) Refresh runs a complete historical pass.")
+                            Text(coverage.message)
                                 .font(.caption)
                                 .foregroundColor(CodexBarPalette.secondaryText)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -671,15 +660,21 @@ struct CodexBarRootView: View {
                         options: ["7 days", "30 days", "90 days", "6 months", "1 year"],
                         keyPath: \.historyWindow)
                     Divider()
-                    self.infoRow(label: "Remote mount policy", value: "Exclude SSHFS, FUSE, NFS, SMB and 9p")
+                    self.infoRow(label: "Locations", value: "Known Codex session paths only")
                     Divider()
-                    self.infoRow(label: "Scan policy", value: "Incremental cache · bounded work budget")
+                    self.infoRow(label: "Indexing", value: "Incremental cache · changed files only")
                 }
             }
 
             self.sectionLabel("DIAGNOSTICS")
             self.card {
                 VStack(spacing: 14) {
+                    self.settingPickerRow(
+                        title: "Surface style",
+                        subtitle: "Solid uses fully opaque app surfaces. Automatic is solid outside macOS.",
+                        options: ["Automatic", "Solid", "Layered"],
+                        keyPath: \.surfaceStyle)
+                    Divider()
                     #if os(Linux)
                     self.settingPickerRow(
                         title: "UI renderer",
@@ -699,6 +694,19 @@ struct CodexBarRootView: View {
                         keyPath: \.verboseProviderErrors)
                 }
             }
+
+            self.sectionLabel("PRIVACY")
+            self.card {
+                VStack(spacing: 14) {
+                    self.infoRow(label: "Disk", value: "Known provider files; no filesystem crawl")
+                    Divider()
+                    self.infoRow(label: "Processes", value: "Not inspected by this frontend")
+                    Divider()
+                    self.infoRow(label: "Remote systems", value: "No SSH or mount discovery")
+                    Divider()
+                    self.infoRow(label: "Browser data", value: "Only for an enabled provider source")
+                }
+            }
         }
     }
 
@@ -714,7 +722,7 @@ struct CodexBarRootView: View {
                         Text("◉")
                             .font(.title)
                             .frame(width: 48, height: 48)
-                            .background(CodexBarPalette.selectionBackground)
+                            .background(self.selectionBackground)
                             .cornerRadius(12)
                         VStack(spacing: 3) {
                             Text("CodexBar")
@@ -872,6 +880,17 @@ extension CodexBarRootView {
             if let window = snapshot.tertiary {
                 self.quotaCard(label: descriptor.metadata.opusLabel ?? "Additional quota", window: window)
             }
+            ForEach(snapshot.extraRateWindows ?? [], id: \.id) { extra in
+                if extra.usageKnown {
+                    self.quotaCard(label: extra.title, window: extra.window)
+                }
+            }
+            if self.model.preferences.showCost, let cost = snapshot.providerCost {
+                self.providerCostCard(cost)
+            }
+            ForEach(Array(snapshot.details.enumerated()), id: \.offset) { _, section in
+                self.providerDetailSection(section)
+            }
         }
     }
 
@@ -893,6 +912,59 @@ extension CodexBarRootView {
                         .font(.caption)
                         .foregroundColor(CodexBarPalette.secondaryText)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+    }
+
+    private func providerCostCard(_ cost: ProviderCostSnapshot) -> some View {
+        self.card {
+            VStack(spacing: 10) {
+                HStack {
+                    Text(cost.period ?? "Extra usage")
+                        .font(.headline)
+                    Spacer()
+                    Text(UsageFormatter.currencyString(cost.used, currencyCode: cost.currencyCode))
+                        .fontWeight(.bold)
+                }
+                if cost.limit > 0 {
+                    ProgressView(value: max(0, min(1, cost.used / cost.limit)))
+                    Text(
+                        UsageFormatter.currencyString(cost.used, currencyCode: cost.currencyCode)
+                            + " of "
+                            + UsageFormatter.currencyString(cost.limit, currencyCode: cost.currencyCode))
+                        .font(.caption)
+                        .foregroundColor(CodexBarPalette.secondaryText)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+    }
+
+    private func providerDetailSection(_ section: ProviderDetailSection) -> some View {
+        self.card {
+            VStack(spacing: 9) {
+                if let title = section.title {
+                    Text(title)
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                ForEach(Array(section.rows.enumerated()), id: \.offset) { _, row in
+                    HStack(spacing: 14) {
+                        Text(row.label)
+                            .foregroundColor(CodexBarPalette.secondaryText)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        VStack(spacing: 2) {
+                            Text(row.value)
+                                .frame(maxWidth: .infinity, alignment: .trailing)
+                            if let secondary = row.secondaryValue {
+                                Text(secondary)
+                                    .font(.caption)
+                                    .foregroundColor(CodexBarPalette.tertiaryText)
+                                    .frame(maxWidth: .infinity, alignment: .trailing)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -925,7 +997,7 @@ extension CodexBarRootView {
             .background {
                 ZStack {
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(CodexBarPalette.cardBackground)
+                        .fill(self.cardBackground)
                     RoundedRectangle(cornerRadius: 12)
                         .stroke(CodexBarPalette.cardBorder, style: StrokeStyle(width: 1))
                 }
@@ -1080,6 +1152,22 @@ extension CodexBarRootView {
         Color(red: provider.accent.red, green: provider.accent.green, blue: provider.accent.blue)
     }
 
+    private var usesSolidSurfaces: Bool {
+        self.model.preferences.usesSolidSurfaces
+    }
+
+    private var sidebarBackground: Color {
+        CodexBarPalette.sidebarBackground(solid: self.usesSolidSurfaces)
+    }
+
+    private var cardBackground: Color {
+        CodexBarPalette.cardBackground(solid: self.usesSolidSurfaces)
+    }
+
+    private var selectionBackground: Color {
+        CodexBarPalette.selectionBackground(solid: self.usesSolidSurfaces)
+    }
+
     private func sidebarGlyph(_ glyph: String) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: 5)
@@ -1183,28 +1271,71 @@ private struct SearchObservedRegion<Content: View>: View {
     }
 }
 
-private enum ContentCacheKey: Hashable {
-    case section(CodexBarCrossModel.Section)
-    case provider
+private struct RouteObservedRegion<Content: View>: View {
+    @State private var navigation: CodexBarCrossNavigationModel
+    private let content: () -> Content
+
+    init(
+        navigation: CodexBarCrossNavigationModel,
+        @ViewBuilder content: @escaping () -> Content)
+    {
+        self._navigation = State(wrappedValue: navigation)
+        self.content = content
+    }
+
+    var body: some View {
+        self.content(observing: self.navigation.state)
+    }
+
+    private func content(observing _: CodexBarCrossNavigationState) -> Content {
+        self.content()
+    }
 }
 
 enum CodexBarPalette {
-    static let windowGradient = [
-        Color(red: 0.105, green: 0.11, blue: 0.135),
-        Color(red: 0.055, green: 0.065, blue: 0.085),
-        Color(red: 0.075, green: 0.055, blue: 0.105),
-    ]
     static let primaryText = Color(white: 0.95)
     static let secondaryText = Color(white: 0.69)
     static let tertiaryText = Color(white: 0.46)
-    static let sidebarBackground = Color(red: 0.035, green: 0.04, blue: 0.055, opacity: 0.82)
-    static let cardBackground = Color(red: 0.15, green: 0.155, blue: 0.18, opacity: 0.78)
     static let cardBorder = Color(white: 0.84, opacity: 0.16)
-    static let selectionBackground = Color(red: 0.12, green: 0.39, blue: 0.44, opacity: 0.82)
     static let accent = Color(red: 0.31, green: 0.67, blue: 0.72)
     static let connected = Color(red: 0.35, green: 0.84, blue: 0.58)
     static let ready = Color(red: 0.43, green: 0.69, blue: 0.91)
     static let attention = Color(red: 0.92, green: 0.42, blue: 0.42)
+
+    static func windowGradient(solid: Bool) -> [Color] {
+        if solid {
+            return [
+                Color(red: 0.105, green: 0.11, blue: 0.12),
+                Color(red: 0.105, green: 0.11, blue: 0.12),
+            ]
+        }
+        return [
+            Color(red: 0.105, green: 0.11, blue: 0.135),
+            Color(red: 0.055, green: 0.065, blue: 0.085),
+            Color(red: 0.075, green: 0.055, blue: 0.105),
+        ]
+    }
+
+    static func sidebarBackground(solid: Bool) -> Color {
+        if solid {
+            return Color(red: 0.055, green: 0.06, blue: 0.07)
+        }
+        return Color(red: 0.035, green: 0.04, blue: 0.055, opacity: 0.82)
+    }
+
+    static func cardBackground(solid: Bool) -> Color {
+        if solid {
+            return Color(red: 0.145, green: 0.15, blue: 0.165)
+        }
+        return Color(red: 0.15, green: 0.155, blue: 0.18, opacity: 0.78)
+    }
+
+    static func selectionBackground(solid: Bool) -> Color {
+        if solid {
+            return Color(red: 0.105, green: 0.31, blue: 0.34)
+        }
+        return Color(red: 0.12, green: 0.39, blue: 0.44, opacity: 0.82)
+    }
 }
 
 #endif

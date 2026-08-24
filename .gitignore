@@ -26,6 +26,7 @@ Codexbar.app/
 *.pkg
 *.tar.gz
 *.tgz
+*.sha256
 Icon.iconset
 debug_*.swift
 

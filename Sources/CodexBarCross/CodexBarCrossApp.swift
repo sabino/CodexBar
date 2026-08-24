@@ -24,7 +24,9 @@ struct CodexBarCrossApp: App {
             setenv("GSK_RENDERER", "cairo", 0)
         }
         #endif
-        self.model = CodexBarCrossModel()
+        let model = CodexBarCrossModel()
+        self.model = model
+        PlatformTrayController.shared.configure(model: model)
     }
 
     var body: some Scene {

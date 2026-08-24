@@ -24,7 +24,7 @@ The cross-platform app is a second executable, not a rewrite of provider logic a
   and tray menu use one Swift implementation under `Sources/CodexBarCross`.
 - `CPlatformTray` supplies `NSStatusItem` on macOS, `Shell_NotifyIcon` on Windows, and StatusNotifierItem over D-Bus on
   Linux.
-- `CodexBarCrossSupport` contains renderer-neutral navigation, history-loading, resize-coalescing, and presentation
+- `CodexBarCrossSupport` contains renderer-neutral navigation, history-loading, history-coverage, and presentation
   helpers that can be tested without creating native windows.
 
 Some integrations have no portable equivalent. WidgetKit, Sparkle, macOS Keychain and browser-cookie bridges,
@@ -55,9 +55,11 @@ tar -xzf CodexBarCross-v*-linux-x86_64.tar.gz
 ./CodexBarCross/CodexBarCross
 ```
 
-The tray implementation uses StatusNotifierItem. KDE, modern GNOME extensions, and compatible panels can host it
-directly. An XEmbed-only panel, including some i3 bars, needs a bridge such as `snixembed`. Escape hides the compact
-window; the custom close button does the same without relying on window-manager decorations.
+The tray implementation uses StatusNotifierItem plus the standard D-Bus menu protocol. Left click toggles the compact
+window; right click exposes Show, Refresh, Settings, About, and Quit through the host panel's native menu. KDE, modern
+GNOME extensions, and compatible panels can host it directly. An XEmbed-only panel, including some i3 bars, needs a
+bridge such as `snixembed`. Escape hides the compact window; the custom close button does the same without relying on
+window-manager decorations.
 
 ### macOS
 
@@ -124,26 +126,52 @@ $bin = swift build -c release --traits CrossPlatformApp --product CodexBarCross 
 ## Usage history and resource behavior
 
 Usage & Spend uses the original Codex historical scanner and its SQLite cache. The first index is a progressive
-historical catch-up. Automatic maintenance runs only after the configured refresh interval and gives each pass a
-bounded 350 ms scan budget; subsequent passes prioritize changed or incomplete sessions and reuse persisted file
-offsets and aggregates.
+historical catch-up. Automatic maintenance runs on the configured refresh schedule and uses the scanner's bounded
+incremental passes; subsequent passes prioritize changed or incomplete sessions and reuse persisted file offsets and
+aggregates. This scheduling is background archive maintenance, not an input, layout, rendering, or navigation
+throttle.
 
 Opening Usage & Spend loads aggregate-only cached history. It does not hydrate every raw session row or synchronously
-walk the whole archive. The partial-index banner is shown only while cache metadata says complete historical coverage
-has not yet been established. Choosing **Refresh** is intentionally different: it drains bounded scanner passes until
-the complete historical refresh succeeds or reports an actionable error.
+walk the whole archive. The partial-index banner appears only when both the snapshot lacks established coverage and a
+current scanner status explicitly reports pending work; stale cache metadata alone cannot show it. Choosing
+**Refresh** is intentionally different: it bypasses debounce, time limits, per-file and per-pass byte limits, and
+candidate paging. It drains the scanner with no inter-pass delay until the complete historical refresh succeeds or
+reports an actionable error. A fully read malformed tail or fork whose parent lineage is unavailable remains
+fail-closed: the UI reports the unresolved session and deferred-line counts, and a timestamp-only cache rewrite is not
+treated as progress or retried in a loop. Cancellation checks remain active; automatic maintenance stays incremental
+and bounded.
 
 The dashboard offers 7-day, 30-day, 90-day, and All ranges. The shared scanner currently requests and retains up to
 365 days for this view. The cache lives under the platform's user cache directory in
 `CodexBar/cost-usage/cost-usage.sqlite`; it uses the original schema, parser hash, checkpoints, and incremental scan
 state.
 
+CodexBar does not recursively crawl arbitrary disks, enumerate mounts, or discover SSH hosts. History readers inspect
+the small provider-defined set of config, credential, browser, and session locations needed by enabled sources. The
+Codex scanner walks only known Codex session roots. This frontend does not inspect the process list; browser storage is
+read only when the selected provider source enables it. Platform-owned helpers can still trigger normal operating
+system permission prompts when a user enables a source that requires them.
+
+## Window and input responsiveness
+
+The compact and settings roots consume the native window's full allocation, including live i3 floating and tiling
+resizes. Resize, pointer, picker, toggle, navigation, and content-change events are delivered immediately: there is no
+debounce, coalescer, cooldown, delayed latest-value queue, frame limiter, or low-power multiplier in the portable UI.
+Card decoration is painted behind native controls so the controls remain the pointer targets.
+
+On Linux, closing Settings destroys that window's renderer graph and native surfaces; reopening Settings reconstructs
+it from the shared model. The compact tray window remains retained so tray activation stays immediate.
+
 ## Renderer selection
 
-On Linux, **Automatic** leaves GTK's renderer selection untouched, allowing GTK to use hardware acceleration when the
-driver and session support it. **Low-memory software** sets `GSK_RENDERER=cairo` before GTK starts. It can reduce GPU
-allocation on some systems but may make animation and resizing less fluid. An existing `GSK_RENDERER` environment
-variable always takes precedence.
+**Surface style** controls application paint independently of compositor transparency. Automatic uses layered surfaces
+on macOS and fully opaque solid surfaces elsewhere; Solid is always opaque; Layered keeps the subtle tonal layering
+without depending on desktop blur or transparency.
+
+On Linux, the **Automatic** UI renderer leaves GTK's renderer selection untouched, allowing GTK to use hardware
+acceleration when the driver and session support it. **Low-memory software** sets `GSK_RENDERER=cairo` before GTK
+starts. It can reduce GPU allocation on some systems but may make rendering and resizing less fluid. An existing
+`GSK_RENDERER` environment variable always takes precedence.
 
 macOS uses its native SwiftCrossUI backend and normal platform compositor behavior. The unreleased Windows preview
 does the same through WinUI. Hardware acceleration is opportunistic, not guaranteed for unsupported drivers, remote

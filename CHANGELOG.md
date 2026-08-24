@@ -4,13 +4,30 @@
 
 - Cross-platform Swift UI: remove the redundant footer Settings action from the compact window; the title-bar gear is
   now the single Settings entry point.
+- Cross-platform Swift UI: remove every portable resize, input, navigation, and publication throttle; consume the
+  native window's complete live allocation so i3 tiling/floating resizes and native controls update immediately.
+- Cross-platform Swift UI: restore the compact provider window's original information hierarchy with quota pace,
+  extra usage, cost, provider details, dashboard/status actions, refresh/about/quit actions, and correctly generated
+  provider artwork.
+- Cross-platform tray: expose native Show, Refresh, Settings, About, and Quit context-menu commands through Linux
+  D-Bus menus, macOS NSMenu, and the Windows shell shim instead of toggling an empty surface on right click.
+- Cross-platform appearance: add Automatic, Solid, and Layered surface styles; Automatic is opaque outside macOS, while
+  GTK renderer Automatic remains free to select GPU acceleration and Cairo stays an explicit restart-time fallback.
+- Cross-platform history: show partial coverage only when the current scanner status confirms pending work; explicit
+  Refresh bypasses debounce, duration, byte, and candidate limits and continuously drains the original scanner to
+  complete historical coverage.
 - Distribution: build, smoke-test, checksum, and publish native SwiftCrossUI desktop archives for Linux x86_64 and
   macOS arm64/x86_64 from the fork's GitHub Actions workflow; retain Windows as a source-only preview for now.
 - Build: isolate the optional native renderer graph behind SwiftPM's `CrossPlatformApp` trait so original CLI/core
   builds do not require GTK, GLib/GIO, AppKitBackend, or WinUI development dependencies.
-- Cross-platform history: guarantee an explicit full historical refresh receives a fresh bounded parsing window after
-  discovery, so large archives keep advancing instead of exhausting the time budget before reading session bytes;
-  adopt the preceding scheduling-only cache generation without rebuilding its compatible indexed rows.
+- Cross-platform history: make explicit full historical refresh truly unbounded, eliminating repeated rereads of a
+  large partial session caused by expiring parsing windows; automatic maintenance retains bounded incremental work,
+  and compatible indexed rows are adopted without rebuilding them.
+- Cross-platform history: stop a fully scanned but unresolved fork from masquerading as progress merely because its
+  SQLite row was rewritten; malformed tails and unavailable parent lineage now stop once, stay fail-closed, and report
+  their exact unresolved session and deferred-line counts instead of cycling indefinitely.
+- Cross-platform memory: destroy the Linux Settings renderer graph when that window closes and recreate it on demand,
+  releasing its native widgets and render surfaces while the tray application is idle.
 - Cross-platform history: keep upstream's duplicate-session safety for rowless legacy cache entries by rescanning them
   instead of treating aggregate-only lazy state as proof of canonical row identity.
 - Codex history: process a newly discovered active/archive twin before its matching aggregate-only cache hit so warm
@@ -20,8 +37,8 @@
   credential publishing, bounded directory paging, and `FileManager` session metadata; also gate Darwin-only trust
   APIs and isolate a Swift 6.2 optimizer assertion to one JSONL scan function so the shared provider and history engines
   retain one implementation without invalidating compatible Linux/macOS cache rows.
-- Cross-platform Swift UI: isolate and deduplicate navigation state, retain visited panes, coalesce GTK resize layout,
-  batch refresh publications, and avoid repeatedly measuring native sidebar rows.
+- Cross-platform Swift UI: isolate and deduplicate navigation state, retain visited panes, publish refresh changes
+  directly, and avoid repeatedly measuring native sidebar rows.
 - Cross-platform Swift UI: keep native provider search synchronized and open cached Usage & Spend history without an
   immediate archive walk or repeated full-database integrity scan; explicit Refresh still performs a full catch-up.
 - Cross-platform Swift UI: keep content following live Linux/i3 window resizes and place card borders behind native

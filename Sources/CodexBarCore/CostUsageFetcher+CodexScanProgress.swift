@@ -30,7 +30,7 @@ extension CostUsageFetcher {
             staleSnapshotUpdatedAt: pending ? previousUpdatedAt : nil)
     }
 
-    private static func codexScanProgressKey(progress: CostUsageStoreScanProgress) -> String {
+    static func codexScanProgressKey(progress: CostUsageStoreScanProgress) -> String {
         var hasher = Hasher()
         hasher.combine(progress.metadata.processedBytes)
         hasher.combine(progress.metadata.totalBytes)
@@ -40,7 +40,6 @@ extension CostUsageFetcher {
         hasher.combine(progress.incompleteFileCount)
         hasher.combine(progress.parsedBytes)
         hasher.combine(progress.sourceBytes)
-        hasher.combine(progress.latestFileUpdateUnixMs)
         hasher.combine(progress.bufferedLineCount)
         if let inventoryPaths = progress.metadata.scanInventoryPaths {
             hasher.combine("inventory")
@@ -50,9 +49,14 @@ extension CostUsageFetcher {
         } else {
             hasher.combine("no-inventory")
         }
-        hasher.combine(try? JSONEncoder().encode(progress.discoveryState))
-        hasher.combine(try? JSONEncoder().encode(progress.lookbackState))
-        return "v3:\(progress.fileCount):\(hasher.finalize())"
+        // `updated_at_ms` changes whenever a stalled file is rewritten, even if no byte,
+        // cursor, dependency, or buffered-line state advanced. It is deliberately absent
+        // from this semantic key so an unresolved fork cannot make a manual refresh spin.
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        hasher.combine(try? encoder.encode(progress.discoveryState))
+        hasher.combine(try? encoder.encode(progress.lookbackState))
+        return "v4:\(progress.fileCount):\(hasher.finalize())"
     }
 
     static func codexHistoryCoverageIsEstablished(

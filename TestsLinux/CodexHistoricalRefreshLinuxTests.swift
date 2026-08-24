@@ -4,7 +4,7 @@ import Testing
 
 struct CodexHistoricalRefreshLinuxTests {
     @Test
-    func `manual file work renews an expired idle scanner window`() {
+    func `bounded catch-up renews an expired idle scanner window`() {
         let clock = CodexHistoricalRefreshTestClock()
         let budget = CostUsageScanner.CodexScanBudget(
             maxFileBytes: 100,
@@ -27,6 +27,50 @@ struct CodexHistoricalRefreshLinuxTests {
         budget.consume(workBytes: work)
 
         #expect(budget.shouldStopBeforeNextFile())
+    }
+
+    @Test
+    func `manual refresh removes every scanner work limit`() {
+        var options = CostUsageScanner.Options(
+            maxCodexSessionFileBytes: 100,
+            maxCodexScanBytesPerRefresh: 200,
+            maxCodexScanDurationPerRefresh: 3)
+        options.renewCodexScanDurationBeforeFileWork = true
+
+        CostUsageFetcher.configureCodexCatchUpWorkLimits(
+            &options,
+            unboundedWork: true,
+            maximumScanDurationPerRefresh: 3,
+            renewScanDurationBeforeFileWork: true)
+
+        #expect(options.maxCodexSessionFileBytes == 0)
+        #expect(options.maxCodexScanBytesPerRefresh == 0)
+        #expect(options.maxCodexScanDurationPerRefresh == nil)
+        #expect(!options.renewCodexScanDurationBeforeFileWork)
+    }
+
+    @Test
+    func `manual refresh progress ignores rewrites that do no semantic work`() {
+        let metadata = CostUsageStoreMetadata.empty
+        let initial = CostUsageStoreScanProgress(
+            metadata: metadata,
+            discoveryState: nil,
+            lookbackState: nil,
+            fileCount: 4,
+            incompleteFileCount: 4,
+            parsedBytes: 162_000_000,
+            sourceBytes: 162_000_000,
+            latestFileUpdateUnixMs: 100,
+            bufferedLineCount: 479)
+        var rewritten = initial
+        rewritten.latestFileUpdateUnixMs = 200
+
+        #expect(CostUsageFetcher.codexScanProgressKey(progress: rewritten)
+            == CostUsageFetcher.codexScanProgressKey(progress: initial))
+
+        rewritten.bufferedLineCount -= 1
+        #expect(CostUsageFetcher.codexScanProgressKey(progress: rewritten)
+            != CostUsageFetcher.codexScanProgressKey(progress: initial))
     }
 
     private actor RefreshScript {

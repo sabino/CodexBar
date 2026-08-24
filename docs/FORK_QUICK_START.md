@@ -36,8 +36,8 @@ Visual Studio, SQLite from vcpkg, and the Windows App Runtime. See
 
 - `Sources/CodexBarCore`: provider registry, fetchers, parsers, config, status, cost, and history.
 - `Sources/CodexBarCross`: compact window, settings, Usage & Spend, provider artwork, and shared view tree.
-- `Sources/CodexBarCrossSupport`: portable state and performance seams.
-- `Sources/CPlatformTray`: native Linux/macOS/Windows tray shim.
+- `Sources/CodexBarCrossSupport`: portable navigation and history-policy seams.
+- `Sources/CPlatformTray`: native Linux/macOS/Windows tray shim, including host-native context-menu commands.
 - `Sources/CodexBar`: original SwiftUI/AppKit macOS app.
 - `TestsLinux`: shared core and portable-app tests that run on Linux.
 

@@ -11,8 +11,8 @@ read_when:
 - `Sources/CodexBarCore`: fetch + parse (Codex RPC, PTY runner, Claude probes, OpenAI web scraping, status polling).
 - `Sources/CodexBar`: state + UI (UsageStore, SettingsStore, StatusItemController, menus, icon rendering).
 - `Sources/CodexBarCross`: one SwiftCrossUI compact window and settings UI for Linux, macOS, and Windows.
-- `Sources/CodexBarCrossSupport`: renderer-neutral navigation, history-loading, and resize-coalescing seams.
-- `Sources/CPlatformTray`: native tray adapter (StatusNotifierItem, NSStatusItem, and Shell_NotifyIcon).
+- `Sources/CodexBarCrossSupport`: renderer-neutral navigation, history-loading, and history-coverage seams.
+- `Sources/CPlatformTray`: native tray adapter (StatusNotifierItem/D-Bus menu, NSStatusItem, and Shell_NotifyIcon).
 - `Sources/CodexBarWidget`: WidgetKit extension wired to the shared snapshot.
 - `Sources/CodexBarCLI`: bundled CLI for `codexbar` usage/status output.
 - `Sources/CodexBarClaudeWatchdog`: helper process for stable Claude CLI PTY sessions.
