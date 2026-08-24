@@ -137,6 +137,24 @@ package struct SpendDashboardModel: Equatable, Sendable {
         package let stackStart: Double
         package let stackEnd: Double
 
+        package init(
+            sourceID: String,
+            provider: UsageProvider,
+            providerName: String,
+            day: Date,
+            cost: Double,
+            stackStart: Double,
+            stackEnd: Double)
+        {
+            self.sourceID = sourceID
+            self.provider = provider
+            self.providerName = providerName
+            self.day = day
+            self.cost = cost
+            self.stackStart = stackStart
+            self.stackEnd = stackEnd
+        }
+
         package var id: String {
             "\(self.sourceID):\(Int(self.day.timeIntervalSince1970))"
         }
@@ -262,6 +280,24 @@ package struct SpendDashboardModel: Equatable, Sendable {
         package let cost: Double
         package let stackStart: Double
         package let stackEnd: Double
+
+        package init(
+            sourceID: String,
+            provider: UsageProvider,
+            providerName: String,
+            hour: Date,
+            cost: Double,
+            stackStart: Double,
+            stackEnd: Double)
+        {
+            self.sourceID = sourceID
+            self.provider = provider
+            self.providerName = providerName
+            self.hour = hour
+            self.cost = cost
+            self.stackStart = stackStart
+            self.stackEnd = stackEnd
+        }
 
         package var id: String {
             "\(self.sourceID):\(Int(self.hour.timeIntervalSince1970))"
