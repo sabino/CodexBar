@@ -26,6 +26,9 @@
   immediate archive walk or repeated full-database integrity scan; explicit Refresh still performs a full catch-up.
 - Cross-platform Swift UI: keep content following live Linux/i3 window resizes and place card borders behind native
   controls so pickers, switches, sliders, and buttons receive pointer input.
+- Merged Warp icons keep a present-but-unused bonus lane visible and an exhausted bonus in the missing-secondary layout, matching direct Warp rendering; the visible-zero sentinel now survives the renderer's tenth-percent cache quantization (#3166, fixes #3165). Thanks @akshayprabhu200!
+- Gemini: recognize Google's live consumer-tier shutdown — an HTTP 200 `loadCodeAssist` body whose `ineligibleTiers` carries `UNSUPPORTED_CLIENT` — instead of surfacing the follow-up quota call as a bare `HTTP 403`, so the Antigravity migration guidance and the **Enable Antigravity provider** action appear; the login action also stops deleting `~/.gemini/oauth_creds.json` to launch a sign-in Google rejects (#3139). Thanks @betive37!
+- OpenCodex: price each usage entry once with a pre-resolved models.dev catalog and custom-pricing overlay instead of re-resolving both per entry per accumulator, and memoize day keys and hour buckets (#3136). Thanks @olddonkey!
 
 ### Performance
 - OpenCodex: price each `usage.jsonl` entry once with a pre-resolved models.dev catalog and custom-pricing overlay, memoize day/hour buckets per calendar interval, and read the models.dev cache metadata with a plain `stat` instead of an extended-attribute read — the OpenCodex spend refresh drops from ~12 s to ~3 s on a 35k-entry log with identical output; existing cost caches are adopted on upgrade, not rebuilt (#3136). Thanks @olddonkey!
