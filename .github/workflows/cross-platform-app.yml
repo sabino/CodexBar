@@ -239,6 +239,9 @@ jobs:
 
   build-windows:
     name: Windows x86_64
+    # Source compatibility is retained, but Windows artifacts are intentionally deferred until
+    # the WinUI toolchain is fast and stable enough to be a release gate again.
+    if: ${{ false }}
     # Swift 6.2.1 ships Clang 19. Visual Studio 2026's STL requires Clang 20,
     # so keep this build on the VS 2022 runner until the Swift toolchain moves.
     runs-on: windows-2022
@@ -352,7 +355,7 @@ jobs:
   publish-release:
     name: Publish fork release
     if: ${{ startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-cross.') }}
-    needs: [build-linux, build-macos, build-windows]
+    needs: [build-linux, build-macos]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -370,8 +373,8 @@ jobs:
         run: |
           set -euo pipefail
           mapfile -t assets < <(find release-assets -maxdepth 1 -type f -print | sort)
-          if [[ "${#assets[@]}" -ne 8 ]]; then
-            printf 'Expected 8 release files, found %d:\n' "${#assets[@]}" >&2
+          if [[ "${#assets[@]}" -ne 6 ]]; then
+            printf 'Expected 6 release files, found %d:\n' "${#assets[@]}" >&2
             printf '%s\n' "${assets[@]}" >&2
             exit 1
           fi
@@ -381,7 +384,6 @@ jobs:
 
           - Linux x86_64: GTK 4 desktop executable with the required Swift runtime libraries bundled beside it.
           - macOS arm64 and x86_64: ad-hoc-signed app bundles for this fork (not Apple-notarized).
-          - Windows x86_64: WinUI executable with its Swift runtime and resource payload.
 
           See `README.md` inside each archive and `docs/CROSS_PLATFORM.md` in the repository for runtime requirements.
           EOF

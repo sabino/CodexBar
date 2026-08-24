@@ -22,7 +22,8 @@ read_when:
 1. Keep `upstream/main` mergeable and avoid copying provider logic into the UI target.
 2. Expand renderer-neutral tests for navigation, controls, tray commands, resize delivery, history coverage, and cache
    loading before adding platform-specific workarounds.
-3. Validate every cross release on real Linux, macOS, and Windows hosts in addition to CI smoke tests.
+3. Validate every released build on real Linux and macOS hosts in addition to CI smoke tests; restore Windows release
+   artifacts only after the WinUI build is fast and stable enough to gate tags.
 4. Close portable authentication gaps only through narrow adapters; never show account data from another provider.
 5. Keep idle memory, refresh CPU, and archive I/O measurable and bounded on large local Codex histories.
 

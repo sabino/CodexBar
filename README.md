@@ -5,7 +5,6 @@
 [![Native desktop release](https://img.shields.io/github/v/release/sabino/CodexBar?include_prereleases&label=native%20desktop&style=flat-square&color=0a0a0c)](https://github.com/sabino/CodexBar/releases)
 [![Linux](https://img.shields.io/badge/Linux-GTK%204-fcc624?style=flat-square&logo=linux&logoColor=111)](docs/CROSS_PLATFORM.md)
 [![macOS](https://img.shields.io/badge/macOS-14%2B-0a0a0c?style=flat-square&logo=apple)](docs/CROSS_PLATFORM.md)
-[![Windows](https://img.shields.io/badge/Windows-10%2F11-0078d4?style=flat-square&logo=windows)](docs/CROSS_PLATFORM.md)
 [![macOS 14+](https://img.shields.io/badge/macOS-14%2B-0a0a0c?style=flat-square)](https://github.com/steipete/CodexBar/releases/latest)
 [![Homebrew](https://img.shields.io/badge/brew-steipete%2Ftap%2Fcodexbar-orange?style=flat-square)](https://github.com/steipete/homebrew-tap)
 [![AUR](https://img.shields.io/aur/version/codexbar-cli?style=flat-square&color=1793d1)](https://aur.archlinux.org/packages/codexbar-cli)
@@ -15,13 +14,14 @@
 <a href="https://codexbar.app"><img src="docs/social.png" alt="CodexBar — every AI coding limit in your menu bar. 69 providers." width="100%" /></a>
 
 > **This fork adds a native cross-platform desktop app.** `CodexBarCross` reuses the actual Swift provider and history
-> code through `CodexBarCore` and renders one SwiftCrossUI interface on Linux, macOS, and Windows. The original
-> SwiftUI/AppKit macOS app and CLI remain available and track upstream. See the
+> code through `CodexBarCore` and ships one SwiftCrossUI interface on Linux and macOS. The Windows backend remains in
+> the source tree as an unreleased preview. The original SwiftUI/AppKit macOS app and CLI remain available and track
+> upstream. See the
 > [cross-platform guide](docs/CROSS_PLATFORM.md).
 
 CodexBar keeps **AI coding-provider limits visible** and shows when each window resets. The original macOS 14+ app is
-a tiny menu bar utility; this fork's native SwiftCrossUI app brings the same shared provider core to Linux, macOS, and
-Windows. Codex, OpenAI, Claude, Cursor, Gemini, Copilot, Grok, GroqCloud, ElevenLabs, Deepgram, z.ai, MiniMax, Kiro,
+a tiny menu bar utility; this fork's released native SwiftCrossUI app brings the same shared provider core to Linux
+and macOS. Codex, OpenAI, Claude, Cursor, Gemini, Copilot, Grok, GroqCloud, ElevenLabs, Deepgram, z.ai, MiniMax, Kiro,
 Zed, Vertex AI, Augment, OpenRouter, LiteLLM, LLM Proxy, Codebuff, Command Code, ClinePass, AWS Bedrock, and many newer
 coding providers are represented by the shared registry. Platform-specific data sources remain available only where
 the host operating system supports them.
@@ -37,18 +37,17 @@ the host operating system supports them.
 
 ## Install
 
-### Native desktop app — Linux, macOS, and Windows
+### Native desktop app — Linux and macOS
 
 Download the matching `CodexBarCross` archive and checksum from the
 [fork releases](https://github.com/sabino/CodexBar/releases):
 
 - Linux x86_64: `CodexBarCross-v*-linux-x86_64.tar.gz`
 - macOS arm64 or x86_64: `CodexBarCross-v*-macos-<architecture>.zip`
-- Windows x86_64: `CodexBarCross-v*-windows-x86_64.zip`
 
-The Linux archive needs GTK 4, GLib/GIO, and SQLite runtime libraries. Windows needs the Windows App Runtime version
-documented in the archive. Fork macOS bundles are ad-hoc signed and are not notarized. Exact install, tray-host, and
-runtime instructions are in [Cross-platform desktop app](docs/CROSS_PLATFORM.md).
+The Linux archive needs GTK 4, GLib/GIO, and SQLite runtime libraries. Fork macOS bundles are ad-hoc signed and are
+not notarized. Exact install, tray-host, and runtime instructions are in
+[Cross-platform desktop app](docs/CROSS_PLATFORM.md).
 
 ### Original macOS app
 
@@ -248,7 +247,7 @@ swift build --traits CrossPlatformApp --product CodexBarCross
 swift build --traits CrossPlatformApp --product CodexBarCross
 swift run --traits CrossPlatformApp CodexBarCross
 
-# Windows, from a Visual Studio developer shell after installing sqlite3:x64-windows
+# Windows source preview, from a Visual Studio developer shell after installing sqlite3:x64-windows
 swift build --traits CrossPlatformApp --product CodexBarCross
 ```
 
@@ -282,8 +281,9 @@ CLI install:
 
 ## Other desktop integrations
 
-The native Swift desktop app in this fork supports Windows and Linux directly. The following community integrations
-remain useful for desktop shells and panels that prefer CLI-backed widgets:
+The native Swift desktop app in this fork supports Linux directly; the Windows backend remains an unreleased source
+preview. The following community integrations remain useful for desktop shells and panels that prefer CLI-backed
+widgets:
 - [codexbar-waybar](https://github.com/Marouan-chak/codexbar-waybar) — Waybar custom module + GTK4 popover for Hyprland / Sway / other Wayland compositors, built on top of the bundled Linux CLI.
 - [codexbar-cosmic-applet](https://github.com/andrew-verde/codexbar-cosmic-applet) — Native COSMIC (System76) desktop panel applet with a tab per provider, pace projections, and cost/token stats, built on top of the bundled Linux CLI.
 - [Codexbar GNOME](https://extensions.gnome.org/extension/9841/codexbar/) — GNOME Shell extension that brings CodexBar usage into the desktop panel.

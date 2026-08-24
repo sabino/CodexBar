@@ -16,7 +16,7 @@ read_when:
 - Linux: Clang, GTK 4 and GLib development headers, SQLite development headers, and `pkg-config`.
 - macOS: Xcode 26 or a compatible Swift 6.2.1 toolchain.
 - Windows: Swift 6.2.1, Visual Studio 2022 with the Windows SDK, vcpkg `sqlite3:x64-windows`, and Windows App Runtime
-  `1.5.240205001-preview1` for launching the WinUI build.
+  `1.5.240205001-preview1` for launching the unreleased WinUI source preview.
 
 Start with `swift build --traits CrossPlatformApp --product CodexBarCross`. The trait keeps renderer dependencies out
 of CLI-only builds. The complete commands and release layouts are in

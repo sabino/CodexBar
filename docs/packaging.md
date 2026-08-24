@@ -11,8 +11,8 @@ read_when:
 ## Scripts
 - `Scripts/package_cross_platform_app.sh`: stages Linux tarballs or ad-hoc-signed macOS app bundles from an existing
   `CodexBarCross` release build and emits a SHA-256 checksum.
-- `Scripts/package_cross_platform_windows.ps1`: stages the Windows executable, Swift runtime, SQLite DLLs, resources,
-  documentation, and checksum.
+- `Scripts/package_cross_platform_windows.ps1`: retained for source-preview Windows packaging; Windows is not part of
+  the current release workflow.
 - `Scripts/test_package_cross_platform_app.sh`: validates the portable Linux archive contract without a full build.
 - `Scripts/package_app.sh`: builds host arch with ad-hoc signing by default; set `ARCHES="arm64 x86_64"` for universal. Verifies slices. Stable-certificate packaging requires explicit `CODEXBAR_SIGNING=identity` plus `APP_IDENTITY`.
 - `Scripts/compile_and_run.sh`: uses host arch; pass `--release-universal` or `--release-arches="arm64 x86_64"` for release packaging.
@@ -28,8 +28,8 @@ read_when:
   resource bundle, license, version, and runtime guide. GTK/GLib/SQLite remain host libraries.
 - macOS archives contain a minimal `CodexBarCross.app` with the same resource payload and an ad-hoc signature. These
   fork artifacts are not notarized and do not include Sparkle or WidgetKit.
-- Windows archives contain `CodexBarCross.exe`, all SwiftPM resources, Swift runtime DLLs, and vcpkg runtime DLLs.
-  Windows App Runtime remains a machine prerequisite.
+- Source-preview Windows packages contain `CodexBarCross.exe`, SwiftPM resources, Swift runtime DLLs, and vcpkg
+  runtime DLLs. They are not currently published as release assets.
 
 ### Original macOS app
 
@@ -38,8 +38,8 @@ read_when:
 - SwiftPM resource bundles (e.g. `KeyboardShortcuts_KeyboardShortcuts.bundle`) copied into `Contents/Resources` (required for `KeyboardShortcuts.Recorder`).
 
 ## Releases
-- `.github/workflows/cross-platform-app.yml` builds and smoke-tests all supported native desktop assets. A
-  `v*-cross.*` tag publishes them as a fork prerelease.
+- `.github/workflows/cross-platform-app.yml` builds and smoke-tests Linux x86_64 plus macOS arm64/x86_64. A
+  `v*-cross.*` tag publishes those assets as a fork prerelease.
 - The original signed macOS app follows the full checklist in `docs/RELEASING.md`.
 
 See also: `docs/CROSS_PLATFORM.md`, `docs/sparkle.md`.

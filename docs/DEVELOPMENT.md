@@ -166,9 +166,9 @@ bin_dir="$(swift build -c release --traits CrossPlatformApp --product CodexBarCr
 ./Scripts/package_cross_platform_app.sh linux 0.0.0-dev x86_64 "$bin_dir" /tmp/codexbar-assets
 ```
 
-macOS uses the same script with `macos`; Windows uses `Scripts/package_cross_platform_windows.ps1`. See
-[Cross-platform desktop app](CROSS_PLATFORM.md) for dependencies, archive layouts, renderer behavior, and CI release
-tags.
+macOS uses the same script with `macos`. The source-only Windows preview retains
+`Scripts/package_cross_platform_windows.ps1`, but is not part of the current release gate. See
+[Cross-platform desktop app](CROSS_PLATFORM.md) for dependencies, archive layouts, renderer behavior, and CI tags.
 
 ### Local Development Build
 ```bash

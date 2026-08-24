@@ -28,18 +28,19 @@ make test
 git push origin HEAD:main
 ```
 
-Wait for the branch/main run of `.github/workflows/cross-platform-app.yml` to pass on Linux x86_64, macOS arm64,
-macOS x86_64, and Windows x86_64. Then push the tag:
+Wait for the branch/main run of `.github/workflows/cross-platform-app.yml` to pass on Linux x86_64 plus macOS arm64
+and x86_64. Then push the tag:
 
 ```bash
 git tag v0.54.1-cross.1
 git push origin v0.54.1-cross.1
 ```
 
-The tag run rebuilds and smoke-tests every executable, creates archives and SHA-256 files, and publishes a prerelease
-to `sabino/CodexBar`. Verify all eight assets, download them into a temporary directory, check the hashes, and inspect
-each archive before declaring the release complete. Cross tags are intentionally excluded from `release-cli.yml`, so
-they cannot update the upstream Homebrew tap or macOS appcast.
+The tag run rebuilds and smoke-tests every released executable, creates archives and SHA-256 files, and publishes a
+prerelease to `sabino/CodexBar`. Verify all six assets, download them into a temporary directory, check the hashes,
+and inspect each archive before declaring the release complete. Windows remains a source-only preview and is not a
+release gate. Cross tags are intentionally excluded from `release-cli.yml`, so they cannot update the upstream
+Homebrew tap or macOS appcast.
 
 The fork macOS app bundles are ad-hoc signed and not notarized. This release track must not be presented as a
 replacement for the Developer ID-signed original macOS release. See [Cross-platform desktop app](CROSS_PLATFORM.md)

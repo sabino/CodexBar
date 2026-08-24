@@ -1,5 +1,5 @@
 ---
-summary: "Build, install, and maintain the native SwiftCrossUI desktop app for Linux, macOS, and Windows."
+summary: "Build, install, and maintain the native SwiftCrossUI desktop app for Linux and macOS."
 read_when:
   - Building or installing CodexBarCross
   - Debugging its tray, renderer, settings, or usage history
@@ -10,8 +10,8 @@ read_when:
 
 `CodexBarCross` is the native Swift desktop port in this fork. It keeps provider parsing, authentication sources,
 quota models, pricing, and historical usage in the same `CodexBarCore` used by the original CodexBar app and CLI.
-Linux, macOS, and Windows render one SwiftCrossUI view tree; only the window, tray, and native-control adapters vary by
-platform.
+Linux and macOS releases render one SwiftCrossUI view tree; the Windows backend remains in the same source tree as an
+unreleased preview. Only the window, tray, and native-control adapters vary by platform.
 
 The original SwiftUI/AppKit app under `Sources/CodexBar` remains the canonical signed and notarized macOS product.
 The cross-platform app is a second executable, not a rewrite of provider logic and not an Electron or Rust shell.
@@ -41,7 +41,6 @@ Cross-platform releases use tags such as `v0.54.1-cross.1` and contain:
 | Linux x86_64 | `CodexBarCross-v<version>-linux-x86_64.tar.gz` | Stripped executable with its Swift runtime libraries; GTK/GLib/SQLite remain system libraries. |
 | macOS arm64 | `CodexBarCross-v<version>-macos-arm64.zip` | Ad-hoc signed, not Apple-notarized. |
 | macOS x86_64 | `CodexBarCross-v<version>-macos-x86_64.zip` | Ad-hoc signed, not Apple-notarized. |
-| Windows x86_64 | `CodexBarCross-v<version>-windows-x86_64.zip` | Includes Swift and SQLite DLLs; Windows App Runtime is installed separately. |
 
 Each archive has a matching `.sha256` file. Download releases from
 <https://github.com/sabino/CodexBar/releases>.
@@ -73,13 +72,12 @@ Fork builds are ad-hoc signed for reproducible CI packaging and are not notarize
 Open action. Use the original CodexBar release when Developer ID signing, notarization, Sparkle updates, WidgetKit, or
 the complete macOS integration set is required.
 
-### Windows
+### Windows source preview
 
-Install the x64 Windows App Runtime `1.5.240205001-preview1`, extract the archive, and run
-`CodexBarCross/CodexBarCross.exe`. The release workflow smoke-tests this exact runtime because SwiftCrossUI 0.9.0's
-WinUI backend targets it. Ordinary provider helper commands launch through native `Foundation.Process`; Unix PTY-only
-CLI interactions fail soft when a provider has no API, OAuth, config-file, or non-interactive command fallback on
-Windows.
+Windows release archives are deferred. The WinUI backend, tray shim, host compatibility layer, and packaging script
+remain available for source builds, but Windows is not currently a release gate. Ordinary provider helper commands
+launch through native `Foundation.Process`; Unix PTY-only CLI interactions fail soft when a provider has no API,
+OAuth, config-file, or non-interactive command fallback on Windows.
 
 ## Build from source
 
@@ -111,7 +109,7 @@ bin_dir="$(swift build -c release --traits CrossPlatformApp --product CodexBarCr
 ./Scripts/package_cross_platform_app.sh macos 0.0.0-dev arm64 "$bin_dir" /tmp/codexbar-assets
 ```
 
-### Windows
+### Windows source preview
 
 Build from a Visual Studio developer shell with Swift 6.2.1, SQLite from vcpkg, and the Windows SDK available:
 
@@ -147,9 +145,9 @@ driver and session support it. **Low-memory software** sets `GSK_RENDERER=cairo`
 allocation on some systems but may make animation and resizing less fluid. An existing `GSK_RENDERER` environment
 variable always takes precedence.
 
-macOS and Windows use their native SwiftCrossUI backends and normal platform compositor behavior. Hardware
-acceleration is opportunistic, not guaranteed for unsupported drivers, remote sessions, or software-rendered desktop
-environments.
+macOS uses its native SwiftCrossUI backend and normal platform compositor behavior. The unreleased Windows preview
+does the same through WinUI. Hardware acceleration is opportunistic, not guaranteed for unsupported drivers, remote
+sessions, or software-rendered desktop environments.
 
 ## Validation and releases
 
@@ -161,6 +159,7 @@ make check
 make test
 ```
 
-`.github/workflows/cross-platform-app.yml` builds and smoke-tests Linux x86_64, macOS arm64, macOS x86_64, and
-Windows x86_64. Branch builds are retained as workflow artifacts. A `v*-cross.*` tag publishes the same archives and
-checksums as a prerelease in this fork. Cross tags are excluded from the upstream CLI/Homebrew release workflow.
+`.github/workflows/cross-platform-app.yml` builds and smoke-tests Linux x86_64 plus macOS arm64 and x86_64. Branch
+builds are retained as workflow artifacts. A `v*-cross.*` tag publishes those three archives and checksums as a
+prerelease in this fork. The Windows job is intentionally disabled until that toolchain is ready to become a release
+gate again. Cross tags are excluded from the upstream CLI/Homebrew release workflow.
