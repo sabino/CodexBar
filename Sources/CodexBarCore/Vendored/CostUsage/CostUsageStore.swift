@@ -87,6 +87,9 @@ actor CostUsageStore {
         "ad52067daa4e07eb", // Windows-only metadata fallback; Linux/macOS persisted rows are unchanged.
         "4563a0078e5bfa32", // Windows directory paging and Claude stamps; Linux/macOS rows are unchanged.
         "eba6d88177618bde", // Windows-only optimizer workaround; parsed rows are unchanged.
+        "3c984b655688593f", // 0.54.x row-ownership evidence fix; parser and persisted row shape unchanged.
+        "4ef4602328fc950d", // Fork lazy persistence bookkeeping; parsed rows are unchanged.
+        "f32f777678639d49", // Upstream baseline before cross-platform persistence shims; rows are unchanged.
     ]
 
     /// Test-only crash injection: invoked inside `saveCodexCache`'s transaction after each
