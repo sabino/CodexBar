@@ -76,7 +76,19 @@ extension CostUsageStore {
     {
         var cache = cache
         Self.reconcileCompletedCodexCatchUp(cache: &cache)
+        let budgetProtectionWindow = Self.budgetProtectionWindow(
+            cache: cache,
+            requestedScanWindow: requestedScanWindow)
         if cache.files.values.contains(where: { $0.codexLazyStorageState != nil }) {
+            if skipIdenticalContent,
+               let result = self.skipCompactSaveIfIdentical(
+                   cache,
+                   calendar: calendar,
+                   budgetProtectionWindow: budgetProtectionWindow,
+                   budgets: (rows: rowBudget, fileBytes: fileBudgetBytes))
+            {
+                return result
+            }
             return self.saveCompactCodexCache(
                 cache,
                 calendar: calendar,
@@ -85,9 +97,6 @@ extension CostUsageStore {
                 budgets: (rows: rowBudget, fileBytes: fileBudgetBytes))
         }
         let previous = self.readSnapshot()
-        let budgetProtectionWindow = Self.budgetProtectionWindow(
-            cache: cache,
-            requestedScanWindow: requestedScanWindow)
         if skipIdenticalContent,
            Self.persistedContentMatches(
                previous: previous,
@@ -289,12 +298,13 @@ extension CostUsageStore {
     /// those are normalized before the comparison. The priority sqlite cursor is also ignored
     /// here: it advances independently of usage content and is written as a metadata-only
     /// update on the skip path.
-    private static func persistedContentMatches(
+    static func persistedContentMatches(
         previous: CostUsageStoreSnapshot,
         cache: CostUsageCache,
-        calendar: Calendar) -> Bool
+        calendar: Calendar,
+        rawDetailsHydrated: Bool = true) -> Bool
     {
-        var restored = Self.cache(from: previous)
+        var restored = Self.cache(from: previous, rawDetailsHydrated: rawDetailsHydrated)
         guard restored.timeZoneIdentifier == nil
             || restored.timeZoneIdentifier == calendar.timeZone.identifier
         else { return false }
@@ -316,7 +326,7 @@ extension CostUsageStore {
 
     /// Writes only `scan_metadata.priorityTurnStatePayload` when the sqlite cursor advanced.
     /// Caller already owns the save transaction.
-    private func persistPriorityTurnsCursorIfChanged(
+    func persistPriorityTurnsCursorIfChanged(
         previous: CostUsageStoreSnapshot,
         cache: CostUsageCache) -> Bool
     {
