@@ -49,6 +49,7 @@ public struct ProviderRuntimeSession: Sendable {
             base: configuredSource,
             account: account,
             config: providerConfig) ?? configuredSource
+        // Provider-specific by design: Codex needs its scoped environment in both usage and CLI version probes.
         let baseFetcher = UsageFetcher()
         let fetcher = provider == .codex ? UsageFetcher(environment: environment) : baseFetcher
         let tokenUpdater = self.tokenUpdater(for: account)
@@ -95,6 +96,7 @@ public struct ProviderRuntimeSession: Sendable {
         config: ProviderConfig?,
         account: ProviderTokenAccount?) -> ProviderSettingsSnapshot?
     {
+        // Provider-specific by design: Codex reconciles managed homes before building its canonical settings snapshot.
         if provider == .codex {
             let reconciliation = self.codexAccountReconciler(config: config).loadSnapshot()
             let resolvedSource = CodexActiveSourceResolver.resolve(from: reconciliation)
@@ -156,6 +158,7 @@ public struct ProviderRuntimeSession: Sendable {
             provider: provider,
             config: config,
             selectedAccount: account)
+        // Provider-specific by design: only Codex supports per-account CODEX_HOME isolation.
         guard provider == .codex,
               let codexHome = self.codexHomePath(config: config)
         else { return environment }

@@ -490,6 +490,7 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
             // This is the original incremental scanner with a cross-platform
             // 350 ms budget. Its compact load retains aggregate history and only
             // hydrates raw rows for files whose size/mtime or tail state changed.
+            // Provider-specific by design: the first shared desktop history index is the Codex transcript scanner.
             let snapshot = try await self.costFetcher.loadTokenSnapshot(
                 provider: .codex,
                 now: Date(),
@@ -520,6 +521,7 @@ final class CodexBarCrossModel: SwiftCrossUI.ObservableObject {
         guard let snapshot else {
             return SpendDashboardModel(requestedDays: range.rawValue, groups: [])
         }
+        // Provider-specific by design: this frontend currently publishes the canonical Codex spend input.
         let input = SpendDashboardModel.ProviderInput(
             provider: .codex,
             displayName: ProviderDescriptorRegistry.descriptor(for: .codex).metadata.displayName,

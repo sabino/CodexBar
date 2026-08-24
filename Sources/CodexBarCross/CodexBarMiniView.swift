@@ -20,6 +20,7 @@ struct CodexBarMiniView: View {
 
     init(model: CodexBarCrossModel) {
         self._model = State(wrappedValue: model)
+        // Provider-specific by design: preserve the original app's Codex-first compact-window selection semantics.
         let initial = model.providers.first(where: { $0.id == .codex && $0.enabled })?.id
             ?? model.providers.first(where: \.enabled)?.id
             ?? .codex
@@ -413,6 +414,7 @@ struct CodexBarMiniView: View {
     }
 
     private func providerGlyph(_ provider: UsageProvider) -> String {
+        // Provider-specific by design: these compact fallbacks mirror recognizable first-party provider marks.
         switch provider {
         case .codex: "◉"
         case .claude: "✳"

@@ -85,6 +85,7 @@ extension CostUsageFetcher {
         let fetcher = self
         return try await CodexHistoricalRefreshCoordinator.run(
             loadSnapshot: {
+                // Provider-specific by design: this coordinator owns the explicit full-history Codex refresh path.
                 try await fetcher.loadTokenSnapshot(
                     provider: .codex,
                     environment: environment,

@@ -1108,6 +1108,7 @@ extension CodexBarRootView {
     }
 
     private func providerGlyph(_ provider: UsageProvider) -> String {
+        // Provider-specific by design: these compact fallbacks mirror recognizable first-party provider marks.
         switch provider {
         case .codex: "◉"
         case .claude: "✳"
