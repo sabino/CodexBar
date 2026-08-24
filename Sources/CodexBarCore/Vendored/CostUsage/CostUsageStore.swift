@@ -91,6 +91,7 @@ actor CostUsageStore {
         "4ef4602328fc950d", // Fork lazy persistence bookkeeping; parsed rows are unchanged.
         "f32f777678639d49", // Upstream baseline before cross-platform persistence shims; rows are unchanged.
         "788d7fa1100f2f14", // Upstream merge before rowless lazy-cache validation; rows are unchanged.
+        "5f8507161b23757c", // 0.54.2 tokscale parity + priority evidence; persisted row shape unchanged.
     ]
 
     /// Test-only crash injection: invoked inside `saveCodexCache`'s transaction after each
