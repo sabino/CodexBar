@@ -6141,6 +6141,49 @@ enum CostUsageScanner {
         let processedPaths: Set<String>
     }
 
+    private static func codexFilesOrderedForLazySessionReconciliation(
+        _ files: [URL],
+        cache: CostUsageCache,
+        checkCancellation: CancellationCheck?) throws -> [URL]
+    {
+        let lazySessionIDs = Set(files.compactMap { fileURL -> String? in
+            guard let cached = cache.files[fileURL.path],
+                  cached.codexLazyStorageState?.rowsHydrated == false,
+                  cached.codexLazyStorageState?.storedHasRows == true
+            else { return nil }
+            return cached.sessionId
+        })
+        guard !lazySessionIDs.isEmpty else { return files }
+
+        var newlyDiscoveredFilesBySessionID: [String: [URL]] = [:]
+        for fileURL in files where cache.files[fileURL.path] == nil {
+            guard let sessionID = try Self.parseCodexSessionIdentifier(
+                fileURL: fileURL,
+                checkCancellation: checkCancellation),
+                lazySessionIDs.contains(sessionID)
+            else { continue }
+            newlyDiscoveredFilesBySessionID[sessionID, default: []].append(fileURL)
+        }
+        guard !newlyDiscoveredFilesBySessionID.isEmpty else { return files }
+
+        var ordered: [URL] = []
+        ordered.reserveCapacity(files.count)
+        var emittedPaths: Set<String> = []
+        for fileURL in files {
+            if let sessionID = cache.files[fileURL.path]?.sessionId,
+               let newlyDiscovered = newlyDiscoveredFilesBySessionID[sessionID]
+            {
+                for candidate in newlyDiscovered where emittedPaths.insert(candidate.path).inserted {
+                    ordered.append(candidate)
+                }
+            }
+            if emittedPaths.insert(fileURL.path).inserted {
+                ordered.append(fileURL)
+            }
+        }
+        return ordered
+    }
+
     private static func scanCodexFiles(
         _ files: [URL],
         context: CodexFileScanContext,
@@ -6153,11 +6196,13 @@ enum CostUsageScanner {
         var scannedPaths = Set(files.map(\.path))
         var attemptedPaths: Set<String> = []
         var processedPaths: Set<String> = []
-        // Parse newly discovered files before aggregate-only cache hits. Their row identities
-        // let a later cached active/archive twin reconcile the shared session without hydrating
-        // every unchanged cache entry or counting the new file once more on a warm refresh.
-        let orderedFiles = files.filter { cache.files[$0.path] == nil }
-            + files.filter { cache.files[$0.path] != nil }
+        // A newly discovered active/archive twin must establish its row identities before an
+        // aggregate-only cache hit for that same session. Match only those twins so bounded
+        // catch-up keeps its existing priority order for every unrelated file.
+        let orderedFiles = try Self.codexFilesOrderedForLazySessionReconciliation(
+            files,
+            cache: cache,
+            checkCancellation: context.checkCancellation)
         for fileURL in orderedFiles {
             if context.scanBudget?.shouldStopBeforeNextFile() == true {
                 break

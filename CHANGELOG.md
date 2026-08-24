@@ -13,9 +13,9 @@
   adopt the preceding scheduling-only cache generation without rebuilding its compatible indexed rows.
 - Cross-platform history: keep upstream's duplicate-session safety for rowless legacy cache entries by rescanning them
   instead of treating aggregate-only lazy state as proof of canonical row identity.
-- Codex history: process newly discovered sessions before aggregate-only cache hits so active/archive twins retain row
-  identity across warm refreshes; advance the parser generation once rather than preserving potentially overcounted
-  cache aggregates.
+- Codex history: process a newly discovered active/archive twin before its matching aggregate-only cache hit so warm
+  refreshes retain row identity without changing the bounded catch-up order for unrelated sessions; advance the parser
+  generation once rather than preserving potentially overcounted cache aggregates.
 - Windows: add a narrow host compatibility layer around native `Foundation.Process`, Win32 termination, secure atomic
   credential publishing, bounded directory paging, and `FileManager` session metadata; also gate Darwin-only trust
   APIs and isolate a Swift 6.2 optimizer assertion to one JSONL scan function so the shared provider and history engines
