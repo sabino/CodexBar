@@ -6153,7 +6153,12 @@ enum CostUsageScanner {
         var scannedPaths = Set(files.map(\.path))
         var attemptedPaths: Set<String> = []
         var processedPaths: Set<String> = []
-        for fileURL in files {
+        // Parse newly discovered files before aggregate-only cache hits. Their row identities
+        // let a later cached active/archive twin reconcile the shared session without hydrating
+        // every unchanged cache entry or counting the new file once more on a warm refresh.
+        let orderedFiles = files.filter { cache.files[$0.path] == nil }
+            + files.filter { cache.files[$0.path] != nil }
+        for fileURL in orderedFiles {
             if context.scanBudget?.shouldStopBeforeNextFile() == true {
                 break
             }
