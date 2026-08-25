@@ -11,11 +11,11 @@ read_when:
 
 ## Cross-platform toolchains
 
-`CodexBarCross` requires Swift 6.2.1 or newer and the platform's native UI toolchain:
+`CodexBarCross` requires the platform's native UI toolchain and a compatible Swift compiler:
 
-- Linux: Clang, GTK 4 and GLib development headers, SQLite development headers, and `pkg-config`.
-- macOS: Xcode 26 or a compatible Swift 6.2.1 toolchain.
-- Windows: Swift 6.2.1, Visual Studio 2022 with the Windows SDK, vcpkg `sqlite3:x64-windows`, and Windows App Runtime
+- Linux: Swift 6.3.3+, Clang, GTK 4 and GLib development headers, SQLite development headers, and `pkg-config`.
+- macOS: Xcode 26, whose Swift toolchain exposes the custom executor API used by the shared renderer.
+- Windows: Swift 6.3.3+, Visual Studio 2022 with the Windows SDK, vcpkg `sqlite3:x64-windows`, and Windows App Runtime
   `1.5.240205001-preview1` for launching the unreleased WinUI source preview.
 
 Start with `swift build --traits CrossPlatformApp --product CodexBarCross`. The trait keeps renderer dependencies out

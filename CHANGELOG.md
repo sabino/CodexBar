@@ -6,6 +6,8 @@
   supported release targets, measured Linux performance envelope, history guarantees, and upstream boundaries.
 - Build: scope SwiftPM workflow caches to the repository checkout identity so renames cannot restore stale absolute
   build paths.
+- Build: align the Linux and deferred Windows renderer jobs and setup docs on Swift 6.3.3, which supplies the custom
+  main-executor API used by the no-polling native UI loop.
 - Cross-platform Swift UI: remove the redundant footer Settings action from the compact window; the title-bar gear is
   now the single Settings entry point.
 - Cross-platform Swift UI: remove every portable resize, input, navigation, and publication throttle; consume the

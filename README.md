@@ -244,7 +244,9 @@ Wondering if CodexBar scans your disk? It doesn’t crawl your filesystem; it re
 
 ## Build from source
 
-The shared desktop build requires Swift 6.2.1+ and the platform's native development libraries:
+The shared desktop build requires Swift 6.3.3+ on Linux/Windows, or Xcode 26's Swift toolchain on macOS, plus the
+platform's native development libraries. The newer open-source toolchain supplies the custom main-executor API used
+to connect Swift concurrency directly to GTK without a polling loop.
 
 ```bash
 # Linux: install clang, GTK 4/GLib, SQLite, and pkg-config first

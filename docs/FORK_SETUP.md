@@ -35,8 +35,8 @@ make check
 make test
 ```
 
-The package requires Swift 6.2.1 or newer. Platform prerequisites are listed in
-[Cross-platform desktop app](CROSS_PLATFORM.md).
+The shared renderer requires Swift 6.3.3 or newer on Linux/Windows, or Xcode 26's Swift toolchain on macOS. Platform
+prerequisites are listed in [Cross-platform desktop app](CROSS_PLATFORM.md).
 
 ## First local sync
 

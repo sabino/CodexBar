@@ -48,14 +48,14 @@ concurrency:
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 env:
-  SWIFT_VERSION: 6.2.1
+  SWIFT_VERSION: 6.3.3
 
 jobs:
   build-linux:
     name: Linux x86_64
     runs-on: ubuntu-24.04
     timeout-minutes: 75
-    container: swift:6.2.1-noble
+    container: swift:6.3.3-noble
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -244,8 +244,7 @@ jobs:
     # Source compatibility is retained, but Windows artifacts are intentionally deferred until
     # the WinUI toolchain is fast and stable enough to be a release gate again.
     if: ${{ false }}
-    # Swift 6.2.1 ships Clang 19. Visual Studio 2026's STL requires Clang 20,
-    # so keep this build on the VS 2022 runner until the Swift toolchain moves.
+    # Keep the source preview on the stable VS 2022 runner until it becomes a release gate again.
     runs-on: windows-2022
     timeout-minutes: 100
     defaults:
@@ -260,8 +259,8 @@ jobs:
       - name: Install Swift ${{ env.SWIFT_VERSION }}
         uses: compnerd/gha-setup-swift@581df1ffa3f3e786ddc73ff37364ee231f9644c5 # v0.3.0
         with:
-          branch: swift-6.2.1-release
-          tag: 6.2.1-RELEASE
+          branch: swift-6.3.3-release
+          tag: 6.3.3-RELEASE
 
       - name: Install SQLite
         run: |

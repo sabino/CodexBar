@@ -84,10 +84,12 @@ OAuth, config-file, or non-interactive command fallback on Windows.
 
 ## Build from source
 
-Use Swift 6.2.1 or newer. The patched SwiftCrossUI renderer source is vendored at its documented upstream revision,
-and the root package's remote dependencies are locked by `Package.resolved`. The `CrossPlatformApp` package trait
-enables only the native renderer graph; leaving it off keeps the original `CodexBarCLI` and `CodexBarCore` builds free
-of GTK, AppKitBackend, and WinUI build dependencies.
+Use Swift 6.3.3 or newer on Linux and Windows, or Xcode 26's Swift toolchain on macOS. Linux needs the newer
+open-source toolchain for the custom main-executor API that connects Swift concurrency directly to GTK without a
+polling loop. The patched SwiftCrossUI renderer source is vendored at its documented upstream revision, and the root
+package's remote dependencies are locked by `Package.resolved`. The `CrossPlatformApp` package trait enables only the
+native renderer graph; leaving it off keeps the original `CodexBarCLI` and `CodexBarCore` builds free of GTK,
+AppKitBackend, and WinUI build dependencies.
 
 ### Linux
 
@@ -115,7 +117,7 @@ bin_dir="$(swift build -c release --traits CrossPlatformApp --product CodexBarCr
 
 ### Windows source preview
 
-Build from a Visual Studio developer shell with Swift 6.2.1, SQLite from vcpkg, and the Windows SDK available:
+Build from a Visual Studio developer shell with Swift 6.3.3, SQLite from vcpkg, and the Windows SDK available:
 
 ```powershell
 vcpkg install sqlite3:x64-windows
