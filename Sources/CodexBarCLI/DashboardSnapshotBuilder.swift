@@ -147,7 +147,9 @@ enum DashboardSnapshotBuilder {
                 error: error,
                 generatedAt: generatedAt),
             accounts: accounts,
-            accountsError: claudeSwap?.adapterError)
+            accountsError: claudeSwap?.adapterError,
+            pace: payload.pace,
+            details: payload.usage?.details ?? [])
     }
 
     private static func providerPresentation(

@@ -33,6 +33,8 @@ Zed, Vertex AI, Augment, OpenRouter, LiteLLM, LLM Proxy, Codebuff, Command Code,
 coding providers are represented by the shared registry. Platform-specific data sources remain available only where
 the host operating system supports them.
 
+> **Native cross-platform fork:** [`native/`](native/) contains the new Rust + Slint tray app for Linux, macOS, and Windows. It uses one shared UI/codebase, compiles to a native binary, and embeds no Chromium, Node.js, Electron, or WebView runtime. The first working slice supports Codex OAuth usage; it is not yet feature-equivalent to the macOS app. On Ubuntu/Regolith, run `native/scripts/install-linux.sh` after building, or see the [native README](native/README.md).
+
 <img src="docs/codexbar.png" alt="CodexBar menu popover with provider tiles, usage bars, and reset countdowns" width="520" />
 
 ## Why

@@ -85,6 +85,9 @@
 - **Faster spend dashboard**: provider baselines and Codex multi-account scans load in parallel, cutting cold opens to roughly the slowest single provider (#3105).
 - **Grok Bot on the Cursor card**: weekly included Bot usage appears as a fourth bar next to Total / Cursor / Third Party (#3127).
 
+### Added
+- Native cross-platform app: add the versioned engine bridge used by the shared Rust + Slint frontend, exposing the complete 69-provider catalog, provider-specific detail sections and pace, enablement actions, and 30-day local cost history without embedding a browser runtime.
+
 ### Fixed
 - Fixed the Codex CLI usage probe against Codex CLI 0.149.0: the removed `untrusted` approval value is replaced by `never` on both the app-server and isolated status launches, keeping the read-only sandbox (#3115, #3118). Thanks @kiranmagic7!
 - Fixed menu bar layout editor drag-and-drop: chips are draggable views instead of Buttons (whose gesture recognizer swallowed the drag), so reordering and the trash zone work again — and the trash zone now also removes the selected token on click (#3121). Thanks @J2TeamNNL!

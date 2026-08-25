@@ -8,6 +8,7 @@ xcuserdata/
 # Build products
 .build/
 DerivedData
+native/target/
 
 # Bundles / artifacts
 # Main app bundle (any variation)

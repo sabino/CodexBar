@@ -323,13 +323,36 @@ extension CodexBarCLI {
         return config.normalized().providers.map { providerConfig in
             let provider = providerConfig.id.firstPartyProvider
             let meta = provider.flatMap { metadata[$0] }
+            let descriptor = provider.map { ProviderDescriptorRegistry.descriptor(for: $0) }
             let defaultEnabled = meta?.defaultEnabled ?? false
             return ConfigProviderStatusResult(
                 provider: providerConfig.id.rawValue,
                 displayName: meta?.displayName ?? providerConfig.id.rawValue,
                 enabled: providerConfig.enabled ?? defaultEnabled,
-                defaultEnabled: defaultEnabled)
+                defaultEnabled: defaultEnabled,
+                shortDisplayName: meta?.shortDisplayName,
+                accentColor: descriptor.map { Self.configProviderHexColor($0.branding.color) },
+                iconResourceName: descriptor?.branding.iconResourceName,
+                sessionLabel: meta?.sessionLabel,
+                weeklyLabel: meta?.weeklyLabel,
+                dashboardURL: meta?.dashboardURL,
+                statusURL: meta?.statusPageURL ?? meta?.statusLinkURL,
+                supportsCredits: meta?.supportsCredits ?? false,
+                supportsCost: descriptor?.tokenCost.supportsTokenCost ?? false,
+                supportsHistory: meta.map { !$0.balanceOnly } ?? false,
+                balanceOnly: meta?.balanceOnly ?? false)
         }
+    }
+
+    private static func configProviderHexColor(_ color: ProviderColor) -> String {
+        func channel(_ value: Double) -> Int {
+            Int((min(1, max(0, value)) * 255).rounded())
+        }
+        return String(
+            format: "#%02X%02X%02X",
+            channel(color.red),
+            channel(color.green),
+            channel(color.blue))
     }
 
     private static func cleanConfigSecret(_ raw: String?) -> String? {
@@ -499,6 +522,17 @@ struct ConfigProviderStatusResult: Encodable, Equatable {
     let displayName: String
     let enabled: Bool
     let defaultEnabled: Bool
+    let shortDisplayName: String?
+    let accentColor: String?
+    let iconResourceName: String?
+    let sessionLabel: String?
+    let weeklyLabel: String?
+    let dashboardURL: String?
+    let statusURL: String?
+    let supportsCredits: Bool
+    let supportsCost: Bool
+    let supportsHistory: Bool
+    let balanceOnly: Bool
 }
 
 private struct ConfigProviderToggleResult: Encodable {
