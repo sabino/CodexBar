@@ -142,9 +142,11 @@ jobs:
           # Keyed on dependency state: saves once per Package.resolved change,
           # and partial hits (restore-keys) still carry the dependency builds,
           # which dominate the cold-build time.
-          key: swiftpm-macos26-arm64-${{ hashFiles('Package.resolved', 'Package.swift') }}
+          # SwiftPM embeds absolute checkout paths in .build. Include the repository
+          # directory name so a GitHub repository rename cannot restore an invalid cache.
+          key: swiftpm-${{ github.event.repository.name }}-macos26-arm64-${{ hashFiles('Package.resolved', 'Package.swift') }}
           restore-keys: |
-            swiftpm-macos26-arm64-
+            swiftpm-${{ github.event.repository.name }}-macos26-arm64-
 
       - name: Swift toolchain version
         run: |
