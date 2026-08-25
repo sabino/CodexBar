@@ -1,5 +1,5 @@
 ---
-summary: "Keep sabino/CodexBar synchronized with steipete/CodexBar without contaminating upstream releases."
+summary: "Keep sabino/CodexBar-Native synchronized with steipete/CodexBar without contaminating upstream releases."
 read_when:
   - Syncing this fork with upstream
   - Resolving shared-core conflicts
@@ -12,7 +12,7 @@ read_when:
 
 ```bash
 git remote -v
-# origin   git@github.com:sabino/CodexBar.git
+# origin   git@github.com:sabino/CodexBar-Native.git
 # upstream git@github.com:steipete/CodexBar.git
 ```
 
@@ -44,7 +44,7 @@ own scripts, then run `make check` and `make test`.
 ## Contribution-ready changes
 
 Potentially upstreamable work should be small, tested, free of fork release metadata, and useful independently of
-`sabino/CodexBar`. Create an upstream PR branch from `upstream/main`, cherry-pick only the relevant commits, and review
+`sabino/CodexBar-Native`. Create an upstream PR branch from `upstream/main`, cherry-pick only the relevant commits, and review
 the complete diff against upstream. Do not include fork tags, GitHub release workflow policy, ad-hoc bundle identity,
 or fork documentation.
 

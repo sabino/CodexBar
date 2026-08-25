@@ -1,5 +1,5 @@
 ---
-summary: "Configure remotes and validate a checkout of sabino/CodexBar."
+summary: "Configure remotes and validate a checkout of sabino/CodexBar-Native."
 read_when:
   - Cloning this fork
   - Configuring origin and upstream remotes
@@ -11,8 +11,8 @@ read_when:
 Clone the fork and keep the original repository as a read-only upstream remote:
 
 ```bash
-git clone git@github.com:sabino/CodexBar.git
-cd CodexBar
+git clone git@github.com:sabino/CodexBar-Native.git
+cd CodexBar-Native
 git remote add upstream git@github.com:steipete/CodexBar.git
 git fetch --all --tags --prune
 git remote -v
@@ -20,7 +20,7 @@ git remote -v
 
 The expected roles are:
 
-- `origin`: `sabino/CodexBar`, the only normal push and release target.
+- `origin`: `sabino/CodexBar-Native`, the only normal push and release target.
 - `upstream`: `steipete/CodexBar`, fetched for compatibility and sync work.
 
 Never push fork branches, cross-platform tags, release artifacts, appcast changes, or Homebrew changes to `upstream`.

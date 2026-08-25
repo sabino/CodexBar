@@ -1,5 +1,5 @@
 ---
-summary: "Compatibility and release priorities for the native Swift cross-platform fork."
+summary: "Compatibility and release priorities for the CodexBar Native cross-platform fork."
 read_when:
   - Planning fork work
   - Reviewing compatibility priorities
@@ -19,6 +19,8 @@ read_when:
   not trigger cyclic rescans.
 - Native window allocation, navigation, and controls are delivered without a portable UI throttle; Linux uses an
   opaque surface by default and lets GTK select GPU acceleration automatically.
+- Linux runtime validation covers exact-pixel resize and route timing, native control interaction, tray commands,
+  GPU selection, settled CPU, proportional memory, and compact/settings window lifecycle behavior.
 - The original SwiftUI/AppKit macOS app and CLI remain in-tree and continue to receive upstream changes.
 
 ## Near-term priorities

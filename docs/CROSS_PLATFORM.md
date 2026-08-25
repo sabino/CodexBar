@@ -1,17 +1,18 @@
 ---
-summary: "Build, install, and maintain the native SwiftCrossUI desktop app for Linux and macOS."
+summary: "Build, install, and maintain the CodexBar Native SwiftCrossUI app for Linux and macOS."
 read_when:
   - Building or installing CodexBarCross
   - Debugging its tray, renderer, settings, or usage history
   - Publishing cross-platform desktop release assets
 ---
 
-# Cross-platform desktop app
+# CodexBar Native desktop app
 
-`CodexBarCross` is the native Swift desktop port in this fork. It keeps provider parsing, authentication sources,
-quota models, pricing, and historical usage in the same `CodexBarCore` used by the original CodexBar app and CLI.
-Linux and macOS releases render one SwiftCrossUI view tree; the Windows backend remains in the same source tree as an
-unreleased preview. Only the window, tray, and native-control adapters vary by platform.
+[`sabino/CodexBar-Native`](https://github.com/sabino/CodexBar-Native) is the native cross-platform fork of
+`steipete/CodexBar`. Its `CodexBarCross` executable keeps provider parsing, authentication sources, quota models,
+pricing, and historical usage in the same `CodexBarCore` used by the original CodexBar app and CLI. Linux and macOS
+releases render one SwiftCrossUI view tree; the Windows backend remains in the same source tree as an unreleased
+preview. Only the window, tray, and native-control adapters vary by platform.
 
 The original SwiftUI/AppKit app under `Sources/CodexBar` remains the canonical signed and notarized macOS product.
 The cross-platform app is a second executable, not a rewrite of provider logic and not an Electron or Rust shell.
@@ -43,7 +44,7 @@ Cross-platform releases use tags such as `v0.54.1-cross.1` and contain:
 | macOS x86_64 | `CodexBarCross-v<version>-macos-x86_64.zip` | Ad-hoc signed, not Apple-notarized. |
 
 Each archive has a matching `.sha256` file. Download releases from
-<https://github.com/sabino/CodexBar/releases>.
+<https://github.com/sabino/CodexBar-Native/releases>.
 
 ### Linux
 
@@ -83,7 +84,8 @@ OAuth, config-file, or non-interactive command fallback on Windows.
 
 ## Build from source
 
-Use Swift 6.2.1 or newer. The dependency graph is pinned by `Package.resolved`. The `CrossPlatformApp` package trait
+Use Swift 6.2.1 or newer. The patched SwiftCrossUI renderer source is vendored at its documented upstream revision,
+and the root package's remote dependencies are locked by `Package.resolved`. The `CrossPlatformApp` package trait
 enables only the native renderer graph; leaving it off keeps the original `CodexBarCLI` and `CodexBarCore` builds free
 of GTK, AppKitBackend, and WinUI build dependencies.
 
@@ -176,6 +178,22 @@ starts. It can reduce GPU allocation on some systems but may make rendering and 
 macOS uses its native SwiftCrossUI backend and normal platform compositor behavior. The unreleased Windows preview
 does the same through WinUI. Hardware acceleration is opportunistic, not guaranteed for unsupported drivers, remote
 sessions, or software-rendered desktop environments.
+
+### Verified Linux performance envelope
+
+The current release build was measured on Regolith/i3 over X11 with GTK 4, Swift 6.3.3, and an NVIDIA EGL renderer.
+These numbers are a reproducible reference point, not a guarantee for every driver or provider set:
+
+- settled tray/compact-window CPU: `0.00%` across five one-second `pidstat` samples;
+- compact window memory: about 211 MB RSS, 157 MB proportional set size, and 42 MB anonymous memory;
+- 1200×800 to 900×620 live resize: approximately 100–117 ms to exact final pixels in a 60 fps capture;
+- settings route change: approximately 167 ms to exact final pixels;
+- Linux release archive: about 35 MB, containing a stripped 33.7 MB executable plus Swift runtime libraries.
+
+RSS includes mapped GTK, Swift, Foundation/ICU, graphics-driver, and other shared libraries, so proportional and
+anonymous memory are the useful process-cost comparisons. Opening Settings creates a larger native widget graph;
+closing it destroys that graph and its surfaces, although process and driver caches may remain warm. The renderer
+performs no periodic UI polling, and settled idle CPU remains zero.
 
 ## Validation and releases
 

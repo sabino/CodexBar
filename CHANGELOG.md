@@ -2,6 +2,8 @@
 
 ## 0.54.2 — Unreleased
 
+- Fork identity: rename the downstream repository to CodexBar Native and document its native Swift architecture,
+  supported release targets, measured Linux performance envelope, history guarantees, and upstream boundaries.
 - Cross-platform Swift UI: remove the redundant footer Settings action from the compact window; the title-bar gear is
   now the single Settings entry point.
 - Cross-platform Swift UI: remove every portable resize, input, navigation, and publication throttle; consume the

@@ -1,5 +1,5 @@
 ---
-summary: "Quick commands and boundaries for the sabino/CodexBar native cross-platform fork."
+summary: "Quick commands and boundaries for the sabino/CodexBar-Native cross-platform fork."
 read_when:
   - Onboarding to this fork
   - Building the portable Swift desktop app
@@ -8,10 +8,11 @@ read_when:
 
 # Fork quick start
 
-This is `sabino/CodexBar`, a fork of `steipete/CodexBar`. It tracks the original macOS app and CLI while adding
+This is `sabino/CodexBar-Native`, a fork of `steipete/CodexBar`. It tracks the original macOS app and CLI while adding
 `CodexBarCross`, a native SwiftCrossUI app released for Linux and macOS, with the Windows backend retained as a source
 preview. Provider and historical-usage behavior stays in the shared `CodexBarCore`; the fork does not maintain a Rust
-or Electron implementation.
+or Electron implementation. The repository name distinguishes the fork; executables, config locations, and shared
+types retain the upstream-compatible `CodexBar` name.
 
 ## Build and run
 

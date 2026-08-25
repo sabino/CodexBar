@@ -1,8 +1,8 @@
-# CodexBar 🎚️ — May your tokens never run out.
+# CodexBar Native 🎚️ — May your tokens never run out.
 
-> Every AI coding limit, in your menu bar.
+> The native cross-platform CodexBar fork for Linux and macOS.
 
-[![Native desktop release](https://img.shields.io/github/v/release/sabino/CodexBar?include_prereleases&label=native%20desktop&style=flat-square&color=0a0a0c)](https://github.com/sabino/CodexBar/releases)
+[![Native desktop release](https://img.shields.io/github/v/release/sabino/CodexBar-Native?include_prereleases&label=native%20desktop&style=flat-square&color=0a0a0c)](https://github.com/sabino/CodexBar-Native/releases)
 [![Linux](https://img.shields.io/badge/Linux-GTK%204-fcc624?style=flat-square&logo=linux&logoColor=111)](docs/CROSS_PLATFORM.md)
 [![macOS](https://img.shields.io/badge/macOS-14%2B-0a0a0c?style=flat-square&logo=apple)](docs/CROSS_PLATFORM.md)
 [![macOS 14+](https://img.shields.io/badge/macOS-14%2B-0a0a0c?style=flat-square)](https://github.com/steipete/CodexBar/releases/latest)
@@ -13,11 +13,18 @@
 
 <a href="https://codexbar.app"><img src="docs/social.png" alt="CodexBar — every AI coding limit in your menu bar. 69 providers." width="100%" /></a>
 
-> **This fork adds a native cross-platform desktop app.** `CodexBarCross` reuses the actual Swift provider and history
-> code through `CodexBarCore` and ships one SwiftCrossUI interface on Linux and macOS. The Windows backend remains in
-> the source tree as an unreleased preview. The original SwiftUI/AppKit macOS app and CLI remain available and track
-> upstream. See the
-> [cross-platform guide](docs/CROSS_PLATFORM.md).
+> **CodexBar Native is the cross-platform fork of `steipete/CodexBar`.** `CodexBarCross` reuses the actual Swift
+> provider and history code through `CodexBarCore` and ships one SwiftCrossUI interface on Linux and macOS. It is not
+> an Electron, webview, Rust, JVM, or Node shell. The Windows backend remains in the source tree as an unreleased
+> preview. The executable and app retain the `CodexBar` name so shared code, config, and potential upstream changes
+> stay compatible. See the [cross-platform guide](docs/CROSS_PLATFORM.md).
+
+| Target | Fork status |
+| --- | --- |
+| Linux x86_64 | Released native GTK 4 app with StatusNotifierItem tray integration. |
+| macOS arm64/x86_64 | Native AppKit-backed archives; ad-hoc signed, not notarized. |
+| Windows x86_64 | WinUI source preview; not currently a release gate. |
+| Original macOS app and CLI | Preserved in-tree and synchronized from upstream. |
 
 CodexBar keeps **AI coding-provider limits visible** and shows when each window resets. The original macOS 14+ app is
 a tiny menu bar utility; this fork's released native SwiftCrossUI app brings the same shared provider core to Linux
@@ -41,7 +48,7 @@ the host operating system supports them.
 ### Native desktop app — Linux and macOS
 
 Download the matching `CodexBarCross` archive and checksum from the
-[fork releases](https://github.com/sabino/CodexBar/releases):
+[CodexBar Native releases](https://github.com/sabino/CodexBar-Native/releases):
 
 - Linux x86_64: `CodexBarCross-v*-linux-x86_64.tar.gz`
 - macOS arm64 or x86_64: `CodexBarCross-v*-macos-<architecture>.zip`
