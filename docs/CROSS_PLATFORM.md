@@ -208,6 +208,7 @@ make test
 ```
 
 `.github/workflows/cross-platform-app.yml` builds and smoke-tests Linux x86_64 plus macOS arm64 and x86_64. Branch
-builds are retained as workflow artifacts. A `v*-cross.*` tag publishes those three archives and checksums as a
-prerelease in this fork. The Windows job is intentionally disabled until that toolchain is ready to become a release
-gate again. Cross tags are excluded from the upstream CLI/Homebrew release workflow.
+builds are retained as workflow artifacts. A `v*-cross.*` tag publishes those three archives and checksums as the
+fork's normal Latest GitHub Release, available from `/releases/latest`. The Windows job is intentionally disabled until
+that toolchain is ready to become a release gate again. Cross tags are excluded from the upstream CLI/Homebrew release
+workflow.

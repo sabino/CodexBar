@@ -36,11 +36,11 @@ git tag v0.54.1-cross.1
 git push origin v0.54.1-cross.1
 ```
 
-The tag run rebuilds and smoke-tests every released executable, creates archives and SHA-256 files, and publishes a
-prerelease to `sabino/CodexBar-Native`. Verify all six assets, download them into a temporary directory, check the hashes,
-and inspect each archive before declaring the release complete. Windows remains a source-only preview and is not a
-release gate. Cross tags are intentionally excluded from `release-cli.yml`, so they cannot update the upstream
-Homebrew tap or macOS appcast.
+The tag run rebuilds and smoke-tests every released executable, creates archives and SHA-256 files, and publishes the
+fork's normal Latest GitHub Release to `sabino/CodexBar-Native`. Verify all six assets, confirm `/releases/latest`
+resolves to the new tag, download the assets into a temporary directory, check the hashes, and inspect each archive
+before declaring the release complete. Windows remains a source-only preview and is not a release gate. Cross tags are
+intentionally excluded from `release-cli.yml`, so they cannot update the upstream Homebrew tap or macOS appcast.
 
 The fork macOS app bundles are ad-hoc signed and not notarized. This release track must not be presented as a
 replacement for the Developer ID-signed original macOS release. See [Cross-platform desktop app](CROSS_PLATFORM.md)

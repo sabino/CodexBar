@@ -2,6 +2,8 @@
 
 ## 0.54.2 — Unreleased
 
+- Distribution: publish native cross-platform tags as normal Latest GitHub Releases instead of hiding them behind
+  prerelease-only discovery, and point installation links directly at the current downloadable release.
 - Fork identity: rename the downstream repository to CodexBar Native and document its native Swift architecture,
   supported release targets, measured Linux performance envelope, history guarantees, and upstream boundaries.
 - Build: scope SwiftPM workflow caches to the repository checkout identity so renames cannot restore stale absolute

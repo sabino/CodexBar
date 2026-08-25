@@ -2,7 +2,7 @@
 
 > The native cross-platform CodexBar fork for Linux and macOS.
 
-[![Native desktop release](https://img.shields.io/github/v/release/sabino/CodexBar-Native?include_prereleases&label=native%20desktop&style=flat-square&color=0a0a0c)](https://github.com/sabino/CodexBar-Native/releases)
+[![Native desktop release](https://img.shields.io/github/v/release/sabino/CodexBar-Native?label=native%20desktop&style=flat-square&color=0a0a0c)](https://github.com/sabino/CodexBar-Native/releases/latest)
 [![Linux](https://img.shields.io/badge/Linux-GTK%204-fcc624?style=flat-square&logo=linux&logoColor=111)](docs/CROSS_PLATFORM.md)
 [![macOS](https://img.shields.io/badge/macOS-14%2B-0a0a0c?style=flat-square&logo=apple)](docs/CROSS_PLATFORM.md)
 [![macOS 14+](https://img.shields.io/badge/macOS-14%2B-0a0a0c?style=flat-square)](https://github.com/steipete/CodexBar/releases/latest)
@@ -48,7 +48,7 @@ the host operating system supports them.
 ### Native desktop app — Linux and macOS
 
 Download the matching `CodexBarCross` archive and checksum from the
-[CodexBar Native releases](https://github.com/sabino/CodexBar-Native/releases):
+[latest CodexBar Native release](https://github.com/sabino/CodexBar-Native/releases/latest):
 
 - Linux x86_64: `CodexBarCross-v*-linux-x86_64.tar.gz`
 - macOS arm64 or x86_64: `CodexBarCross-v*-macos-<architecture>.zip`

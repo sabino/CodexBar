@@ -381,15 +381,16 @@ jobs:
           fi
           notes="$RUNNER_TEMP/codexbar-cross-release-notes.md"
           cat > "$notes" <<'EOF'
-          Native SwiftCrossUI desktop builds from the CodexBar shared Swift core.
+          CodexBar Native is the native SwiftCrossUI desktop build of CodexBar for Linux and macOS.
 
-          - Linux x86_64: GTK 4 desktop executable with the required Swift runtime libraries bundled beside it.
-          - macOS arm64 and x86_64: ad-hoc-signed app bundles for this fork (not Apple-notarized).
+          - Linux x86_64: GTK 4 desktop app and StatusNotifierItem tray integration, with the required Swift runtime libraries bundled beside it.
+          - macOS arm64 and x86_64: native AppKit-backed app bundles, ad-hoc signed for this fork and not Apple-notarized.
+          - Shared engine: the original CodexBar provider, authentication, quota, pricing, and historical-usage core.
 
           See `README.md` inside each archive and `docs/CROSS_PLATFORM.md` in the repository for runtime requirements.
           EOF
           gh release create "$GITHUB_REF_NAME" "${assets[@]}" \
             --repo "$GITHUB_REPOSITORY" \
-            --title "CodexBar Cross ${GITHUB_REF_NAME#v}" \
+            --title "CodexBar Native ${GITHUB_REF_NAME#v}" \
             --notes-file "$notes" \
-            --prerelease
+            --latest
